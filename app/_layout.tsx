@@ -1,24 +1,28 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+    <>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#050816' }, gestureEnabled: true, gestureResponseDistance: { start: 999 } }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="login" />
+        <Stack.Screen name="register" />
+        <Stack.Screen name="forgot-password" />
+        <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="mis-grupos" />
+        <Stack.Screen name="crear-grupo" />
+        <Stack.Screen name="agregar-participantes" />
+        <Stack.Screen name="detalle-grupo" />
+        <Stack.Screen name="pagar-ahora" />
+        <Stack.Screen name="agregar-gasto" />
+        <Stack.Screen name="categorias" />
+        <Stack.Screen name="editar-perfil" />
+        <Stack.Screen name="seguridad" />
+        <Stack.Screen name="amigos" />
+        <Stack.Screen name="join/[id]" />
       </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+      <StatusBar style="light" />
+    </>
   );
 }
