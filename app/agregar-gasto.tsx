@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Keyboard, TouchableWithoutFeedback, ImageBackground } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Keyboard, TouchableWithoutFeedback, ImageBackground, Modal } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import ConfirmPopup from '@/components/ConfirmPopup';
@@ -8,6 +9,7 @@ import { useGruposStore } from '@/store/useGruposStore';
 import { useUserStore } from '@/store/useUserStore';
 import { supabase } from '@/lib/supabase';
 import { needsRatesFetch, fetchRatesMap } from '@/lib/ratesCache';
+import { pickFromCamera, pickFromGallery, uploadTicket, type ImagenElegida } from '@/lib/ticketImage';
 
 const BG = require('@/assets/images/bg.png');
 
@@ -56,8 +58,17 @@ export default function AgregarGastoScreen() {
   const [categoria, setCategoria] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [popupVisible, setPopupVisible] = useState(false);
-  const [popupProx, setPopupProx] = useState(false);
   const [errores, setErrores] = useState<Record<string, string>>({});
+  const [foto, setFoto] = useState<ImagenElegida | null>(null);
+  const [fotoSourceModal, setFotoSourceModal] = useState(false);
+  const [permisoDenegado, setPermisoDenegado] = useState(false);
+
+  const elegirFoto = async (origen: 'camara' | 'galeria') => {
+    setFotoSourceModal(false);
+    const resultado = origen === 'camara' ? await pickFromCamera() : await pickFromGallery();
+    if (resultado === 'denied') { setPermisoDenegado(true); return; }
+    if (resultado) setFoto(resultado);
+  };
 
   const grupoActual = grupos.find(g => g.nombre === grupoSeleccionado);
   const monedasGrupo = grupoActual?.monedas ?? [];
@@ -104,13 +115,24 @@ export default function AgregarGastoScreen() {
     if (Object.keys(nuevosErrores).length > 0) return;
 
     setGuardando(true);
-    const grupoId = grupoActual?.id;
+    const grupoId = grupoActual!.id;
+
+    let fotoPath: string | null = null;
+    if (foto) {
+      fotoPath = await uploadTicket(userId, grupoId, foto.base64);
+      if (!fotoPath) {
+        setGuardando(false);
+        setErrores({ general: 'No se pudo subir la imagen del ticket. Intentá de nuevo.' });
+        return;
+      }
+    }
+
     const { error } = await supabase.from('gastos').insert({
       grupo_id: grupoId, nombre: nombreGasto.trim(),
       pagador_id: pagadorId, pagador_nombre: pagadorNombre,
       monto: Number(monto), moneda: monedaSeleccionada,
       participantes: miembrosSeleccionados.map(m => ({ user_id: m.user_id, nombre: m.nombre })),
-      categoria,
+      categoria, foto_path: fotoPath,
     });
     setGuardando(false);
     if (error) { setErrores({ general: 'No se pudo guardar el gasto. Intentá de nuevo.' }); return; }
@@ -271,10 +293,27 @@ export default function AgregarGastoScreen() {
             {errores.categoria ? <Text style={styles.errorText}>{errores.categoria}</Text> : null}
           </View>
 
-          <TouchableOpacity style={styles.ticketRow} onPress={() => setPopupProx(true)}>
-            <Text style={styles.label}>Agregar imagen de ticket</Text>
-            <Text style={{ fontSize: 22 }}>📎</Text>
-          </TouchableOpacity>
+          {foto ? (
+            <View style={styles.ticketPreviewWrap}>
+              <Image source={{ uri: foto.uri }} style={styles.ticketPreview} contentFit="cover" />
+              <View style={styles.ticketPreviewInfo}>
+                <Text style={styles.ticketPreviewLabel}>Comprobante adjunto</Text>
+                <View style={{ flexDirection: 'row', gap: 16, marginTop: 6 }}>
+                  <TouchableOpacity onPress={() => setFotoSourceModal(true)}>
+                    <Text style={styles.ticketPreviewAction}>Cambiar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setFoto(null)}>
+                    <Text style={[styles.ticketPreviewAction, { color: '#FF4D4D' }]}>Quitar</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.ticketRow} onPress={() => setFotoSourceModal(true)}>
+              <Text style={styles.label}>Agregar imagen de ticket</Text>
+              <Text style={{ fontSize: 22 }}>📎</Text>
+            </TouchableOpacity>
+          )}
 
           {errores.general ? <Text style={[styles.errorText, { textAlign: 'center', marginBottom: 12 }]}>{errores.general}</Text> : null}
 
@@ -286,7 +325,24 @@ export default function AgregarGastoScreen() {
         </ScrollView>
 
         <ConfirmPopup visible={popupVisible} emoji="✅" titulo="¡Gasto agregado!" mensaje="El gasto fue registrado y los balances del grupo se actualizaron." onClose={() => { setPopupVisible(false); router.back(); }} />
-        <ConfirmPopup visible={popupProx} emoji="🚀" titulo="¡Próximamente!" mensaje="Esta función estará disponible en la próxima versión de ChePaga." onClose={() => setPopupProx(false)} />
+        <ConfirmPopup visible={permisoDenegado} emoji="🔒" titulo="Permiso necesario" mensaje="Para adjuntar el comprobante, habilitá el acceso a la cámara o las fotos desde la configuración de tu teléfono." onClose={() => setPermisoDenegado(false)} />
+
+        <Modal transparent animationType="fade" visible={fotoSourceModal} onRequestClose={() => setFotoSourceModal(false)}>
+          <TouchableOpacity style={styles.fotoOverlay} activeOpacity={1} onPress={() => setFotoSourceModal(false)}>
+            <View style={styles.fotoSheet}>
+              <Text style={styles.fotoSheetTitulo}>Adjuntar comprobante</Text>
+              <TouchableOpacity style={styles.fotoOpcion} onPress={() => elegirFoto('camara')}>
+                <View style={styles.fotoOpcionIcon}><Ionicons name="camera-outline" size={22} color="#FFFFFF" /></View>
+                <Text style={styles.fotoOpcionText}>Tomar foto</Text>
+              </TouchableOpacity>
+              <View style={styles.fotoSep} />
+              <TouchableOpacity style={styles.fotoOpcion} onPress={() => elegirFoto('galeria')}>
+                <View style={styles.fotoOpcionIcon}><Ionicons name="image-outline" size={22} color="#FFFFFF" /></View>
+                <Text style={styles.fotoOpcionText}>Elegir de galería</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
       </ImageBackground>
     </TouchableWithoutFeedback>
   );
@@ -333,6 +389,18 @@ const styles = StyleSheet.create({
   categoriaBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
   categoriaBtnError: { backgroundColor: 'rgba(255,77,77,0.2)', borderColor: 'rgba(255,77,77,0.5)' },
   ticketRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  ticketPreviewWrap: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 24, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  ticketPreview: { width: 56, height: 56, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.08)' },
+  ticketPreviewInfo: { flex: 1 },
+  ticketPreviewLabel: { fontSize: 14, fontWeight: '600', color: '#FFFFFF' },
+  ticketPreviewAction: { fontSize: 13, color: '#4A9EFF', fontWeight: '700' },
+  fotoOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+  fotoSheet: { backgroundColor: 'rgba(8,18,40,0.97)', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingTop: 24, paddingBottom: 48, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  fotoSheetTitulo: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.38)', marginBottom: 12, textAlign: 'center', letterSpacing: 0.5 },
+  fotoOpcion: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, gap: 16 },
+  fotoOpcionIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(74,158,255,0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(74,158,255,0.25)' },
+  fotoOpcionText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  fotoSep: { height: 1, backgroundColor: 'rgba(255,255,255,0.07)' },
   guardarBtn: { backgroundColor: '#4A9EFF', borderRadius: 50, paddingVertical: 16, alignItems: 'center' },
   guardarText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   errorText: { color: '#FF4D4D', fontSize: 12, marginTop: 4 },

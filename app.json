@@ -40,7 +40,14 @@
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ChePaga necesita acceso a tus fotos para adjuntar el comprobante del gasto.",
+          "cameraPermission": "ChePaga necesita acceso a la cámara para sacar la foto del comprobante."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
