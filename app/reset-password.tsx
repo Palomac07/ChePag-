@@ -24,7 +24,7 @@ export default function ResetPasswordScreen() {
 
   const handleRestablecer = async () => {
     const nuevos: Record<string, string> = {};
-    if (!/^\d{6}$/.test(codigo)) nuevos.codigo = 'Ingresá el código de 6 dígitos.';
+    if (!/^\d{6,8}$/.test(codigo)) nuevos.codigo = 'Ingresá el código que te llegó por mail.';
     if (!nueva) nuevos.nueva = 'Ingresá la nueva contraseña.';
     else if (!passCheck.valida) nuevos.nueva = 'La contraseña no cumple los requisitos.';
     if (!confirmar) nuevos.confirmar = 'Confirmá la nueva contraseña.';
@@ -71,12 +71,12 @@ export default function ResetPasswordScreen() {
           <Text style={styles.label}>Código de verificación</Text>
           <TextInput
             style={[styles.input, errores.codigo && styles.inputError, styles.codigoInput]}
-            placeholder="______"
+            placeholder="________"
             placeholderTextColor="rgba(255,255,255,0.25)"
             value={codigo}
-            onChangeText={v => { setCodigo(v.replace(/\D/g, '').slice(0, 6)); limpiarError('codigo'); }}
+            onChangeText={v => { setCodigo(v.replace(/\D/g, '').slice(0, 8)); limpiarError('codigo'); }}
             keyboardType="number-pad"
-            maxLength={6}
+            maxLength={8}
           />
           {errores.codigo ? <Text style={styles.errorText}>{errores.codigo}</Text> : null}
 
@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: '#FFFFFF',
     borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)',
   },
-  codigoInput: { letterSpacing: 8, fontSize: 22, textAlign: 'center', fontWeight: '700' },
+  codigoInput: { letterSpacing: 6, fontSize: 20, textAlign: 'center', fontWeight: '700' },
   inputError: { borderColor: '#FF4D4D' },
   passwordContainer: {
     flexDirection: 'row', alignItems: 'center',
