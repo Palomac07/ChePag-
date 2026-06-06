@@ -43,7 +43,12 @@ export default function ResetPasswordScreen() {
     }
     const { error: updErr } = await supabase.auth.updateUser({ password: nueva });
     if (updErr) {
-      setErrores({ general: 'No se pudo actualizar la contraseña. Intentá de nuevo.' });
+      const msg = updErr.message?.toLowerCase() ?? '';
+      if ((updErr as any).code === 'same_password' || msg.includes('different from the old')) {
+        setErrores({ nueva: 'La nueva contraseña debe ser distinta de la anterior.' });
+      } else {
+        setErrores({ general: 'No se pudo actualizar la contraseña. Intentá de nuevo.' });
+      }
       setGuardando(false);
       return;
     }
