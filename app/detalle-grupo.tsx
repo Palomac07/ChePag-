@@ -17,6 +17,7 @@ import { needsRatesFetch, fetchRatesMap } from '@/lib/ratesCache';
 import { useAmistadStore } from '@/store/useAmistadStore';
 import { getSignedUrl } from '@/lib/ticketImage';
 import { Image } from 'expo-image';
+import InvitarSheet from '@/components/InvitarSheet';
 
 const BG = require('@/assets/images/bg.png');
 
@@ -127,6 +128,7 @@ export default function DetalleGrupoScreen() {
   const [ticketUrl, setTicketUrl] = useState<string | null>(null);
   const [ticketVisible, setTicketVisible] = useState(false);
   const [ticketCargando, setTicketCargando] = useState(false);
+  const [invitarVisible, setInvitarVisible] = useState(false);
   const [pagosDB, setPagosDB] = useState<{ de: string; a: string; monto: number }[]>([]);
 
   const abrirTicket = async (path: string) => {
@@ -754,6 +756,10 @@ export default function DetalleGrupoScreen() {
                 <Text style={styles.agregarMiembroText}>+ Agregar miembro</Text>
               </TouchableOpacity>
             )}
+            <TouchableOpacity style={styles.invitarBtn} onPress={() => setInvitarVisible(true)}>
+              <Ionicons name="share-social-outline" size={18} color="#4A9EFF" />
+              <Text style={styles.invitarBtnText}>Invitar gente con un link</Text>
+            </TouchableOpacity>
             {miembrosGrupo.map((m) => {
               const esAdminMiembro = administradores.includes(m.nombre);
               const esSelf = m.user_id === userId || (!!miNombre && m.nombre === miNombre);
@@ -1179,6 +1185,8 @@ export default function DetalleGrupoScreen() {
           }}
         />
 
+        <InvitarSheet visible={invitarVisible} grupoId={id ?? ''} nombreGrupo={nombre ?? 'el grupo'} onClose={() => setInvitarVisible(false)} />
+
         <Modal transparent animationType="fade" visible={ticketVisible} onRequestClose={() => setTicketVisible(false)}>
           <View style={styles.ticketModalOverlay}>
             <TouchableOpacity style={styles.ticketCerrar} onPress={() => setTicketVisible(false)}>
@@ -1288,6 +1296,8 @@ const styles = StyleSheet.create({
   rankingTitulo: { flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.45)', textAlign: 'right' },
   fab: { position: 'absolute', bottom: 90, right: 24, width: 52, height: 52, borderRadius: 26, backgroundColor: '#4A9EFF', alignItems: 'center', justifyContent: 'center', elevation: 4 },
   fabText: { fontSize: 28, color: '#FFFFFF', fontWeight: '700' },
+  invitarBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: 50, marginBottom: 16, backgroundColor: 'rgba(74,158,255,0.12)', borderWidth: 1, borderColor: 'rgba(74,158,255,0.35)' },
+  invitarBtnText: { color: '#4A9EFF', fontSize: 15, fontWeight: '700' },
   miembroCard: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(14,26,52,0.62)', borderRadius: 14, padding: 14, marginBottom: 10,
