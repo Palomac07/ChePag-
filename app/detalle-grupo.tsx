@@ -18,6 +18,7 @@ import { useAmistadStore } from '@/store/useAmistadStore';
 import { getSignedUrl } from '@/lib/ticketImage';
 import { Image } from 'expo-image';
 import InvitarSheet from '@/components/InvitarSheet';
+import { CHEPAGA_LOGO_DATA_URI } from '@/constants/logoBase64';
 
 const BG = require('@/assets/images/bg.png');
 
@@ -181,10 +182,6 @@ export default function DetalleGrupoScreen() {
   }, [cargarDatos, userId]));
 
   useEffect(() => {
-    if (needsRatesFetch()) actualizarTasas();
-  }, [actualizarTasas]);
-
-  useEffect(() => {
     if (grupo?.presupuesto != null) setPresupuesto(grupo.presupuesto);
   }, [grupo?.presupuesto]);
 
@@ -238,6 +235,10 @@ export default function DetalleGrupoScreen() {
 
   const exportarCSV = async () => {
     setExportModalVisible(false);
+    if (!(await Sharing.isAvailableAsync())) {
+      mostrarPopup('ℹ️', 'No disponible', 'La exportación está disponible en la app móvil.');
+      return;
+    }
     try {
       const gastosGrupo = gastos;
       const filas = [
@@ -257,17 +258,24 @@ export default function DetalleGrupoScreen() {
 
   const exportarPDF = async () => {
     setExportModalVisible(false);
+    if (!(await Sharing.isAvailableAsync())) {
+      mostrarPopup('ℹ️', 'No disponible', 'La exportación está disponible en la app móvil.');
+      return;
+    }
     try {
       const gastosGrupo = gastos;
       const balancePDF = calcularBalance(gastosGrupo, monedas);
       const deudasPDF = calcularDeudas(gastosGrupo, monedas);
       const totalARS = gastosGrupo.reduce((acc, g) => acc + g.monto * (monedasMap[g.moneda]?.tasaARS ?? 1), 0);
-      const filasGastos = gastosGrupo.map(g => `<tr><td>${g.nombre}</td><td>${g.pagador}</td><td>${g.fecha}</td><td style="text-align:right">${g.moneda !== 'ARS' ? `${g.moneda} ${g.monto.toLocaleString('es-AR')}` : `$${g.monto.toLocaleString('es-AR')}`}</td><td>${g.participantes.join(', ')}</td></tr>`).join('');
-      const filasBalance = balancePDF.map(b => `<tr><td>${b.nombre}</td><td style="text-align:right;color:${b.monto >= 0 ? '#2E7D32' : '#C0392B'}">${b.monto >= 0 ? '+' : ''}$${b.monto.toLocaleString('es-AR')}</td></tr>`).join('');
-      const filasDeudas = deudasPDF.length > 0
-        ? deudasPDF.map(d => `<tr><td>${d.de}</td><td>→</td><td>${d.a}</td><td style="text-align:right">$${d.monto.toLocaleString('es-AR')}</td></tr>`).join('')
-        : '<tr><td colspan="4" style="text-align:center;color:#2E7D32">✅ Todo saldado</td></tr>';
-      const html = `<html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;padding:32px;color:#1a1a2e;}h1{color:#2A9D8F;font-size:24px;}h2{color:#2A9D8F;font-size:16px;margin-top:28px;border-bottom:2px solid #E0F2F1;padding-bottom:4px;}table{width:100%;border-collapse:collapse;font-size:13px;}th{background:#E0F2F1;color:#2A9D8F;padding:8px 10px;text-align:left;}td{padding:7px 10px;border-bottom:1px solid #F0F0F0;}.total{font-weight:bold;font-size:15px;margin-top:12px;text-align:right;}</style></head><body><h1>${nombre ?? 'Grupo'}</h1><p style="color:#666;font-size:13px;">Reporte generado el ${new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })} · Total: $${Math.round(totalARS).toLocaleString('es-AR')} ARS</p><h2>Gastos</h2><table><thead><tr><th>Nombre</th><th>Pagador</th><th>Fecha</th><th>Monto</th><th>Participantes</th></tr></thead><tbody>${filasGastos}</tbody></table><p class="total">Total: $${Math.round(totalARS).toLocaleString('es-AR')} ARS</p><h2>Balance</h2><table><thead><tr><th>Miembro</th><th>Balance</th></tr></thead><tbody>${filasBalance}</tbody></table><h2>A pagar</h2><table><thead><tr><th>De</th><th></th><th>A</th><th>Monto</th></tr></thead><tbody>${filasDeudas}</tbody></table></body></html>`;
+      const filasGastos = gastosGrupo.map(g => `<tr><td>${g.nombre}</td><td>${g.pagador}</td><td>${g.fecha}</td><td class="amount">${g.moneda !== 'ARS' ? `${g.moneda} ${g.monto.toLocaleString('es-AR')}` : `$${g.monto.toLocaleString('es-AR')}`}</td><td>${g.participantes.join(', ')}</td></tr>`).join('');
+      const filasBalance = balancePDF.map(b => `<tr><td>${b.nombre}</td><td style="text-align:right"><span class="pill ${b.monto >= 0 ? 'pos' : 'neg'}">${b.monto >= 0 ? '+' : '−'}$${Math.abs(b.monto).toLocaleString('es-AR')}</span></td></tr>`).join('');
+      const filasDeudas = deudasPDF.map(d => `<tr><td><strong>${d.de}</strong></td><td class="arrow">→</td><td><strong>${d.a}</strong></td><td class="amount">$${d.monto.toLocaleString('es-AR')}</td></tr>`).join('');
+      const seccionDeudas = deudasPDF.length > 0
+        ? `<div class="card"><table><thead><tr><th>De</th><th></th><th>A</th><th style="text-align:right">Monto</th></tr></thead><tbody>${filasDeudas}</tbody></table></div>`
+        : `<div class="saldado">✅ ¡Todo saldado! No hay deudas pendientes.</div>`;
+      const fechaReporte = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
+      const totalFmt = `$${Math.round(totalARS).toLocaleString('es-AR')}`;
+      const html = `<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>*{box-sizing:border-box;}body{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:28px 26px 36px;color:#1F2A44;background:#fff;}.header{background:#E8F1FB;border:1px solid #D3E2F2;border-radius:18px;padding:22px 18px 20px;text-align:center;}.header img{width:96px;height:96px;display:block;margin:0 auto 6px;border-radius:14px;}.header h1{color:#2B4C8C;font-size:24px;margin:2px 0;font-weight:800;letter-spacing:-0.3px;}.header .sub{color:#6B7A99;font-size:12.5px;margin:0;}.chips{width:100%;border-collapse:separate;border-spacing:10px 0;margin:14px 0 2px;}.chips td{width:33.33%;padding:0;}.chip{background:#F6F9FD;border:1px solid #E6ECF5;border-radius:14px;padding:12px 8px;text-align:center;}.chip .v{font-size:18px;font-weight:800;color:#2B4C8C;}.chip .l{font-size:10px;color:#7385A8;text-transform:uppercase;letter-spacing:0.6px;margin-top:3px;}h2{color:#2B4C8C;font-size:12.5px;text-transform:uppercase;letter-spacing:0.8px;margin:26px 0 10px;padding-left:10px;border-left:4px solid #F5A623;page-break-after:avoid;}.card{border:1px solid #E6ECF5;border-radius:14px;overflow:hidden;}table{width:100%;border-collapse:collapse;font-size:12.5px;}th{background:#E8F1FB;color:#2B4C8C;padding:9px 12px;text-align:left;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:0.4px;}td{padding:9px 12px;border-top:1px solid #EEF2F8;color:#27324D;}tbody tr:nth-child(even){background:#FAFCFE;}tr{page-break-inside:avoid;}.amount{text-align:right;font-weight:600;white-space:nowrap;}.pill{display:inline-block;padding:3px 11px;border-radius:999px;font-weight:700;font-size:12px;}.pill.pos{background:#E7F6EC;color:#1E7A37;}.pill.neg{background:#FCE9E9;color:#C0392B;}.arrow{color:#F5A623;font-weight:800;text-align:center;}.total{font-weight:800;font-size:14px;margin:10px 4px 0;text-align:right;color:#2B4C8C;}.saldado{background:#E7F6EC;color:#1E7A37;border:1px solid #BFE6CB;border-radius:14px;padding:16px;text-align:center;font-weight:700;font-size:13px;}.footer{margin-top:30px;text-align:center;color:#9AA7C2;font-size:10px;border-top:1px solid #EEF2F8;padding-top:12px;}</style></head><body><div class="header"><img src="${CHEPAGA_LOGO_DATA_URI}" alt="ChePagá" /><h1>${nombre ?? 'Grupo'}</h1><p class="sub">Reporte generado el ${fechaReporte}</p></div><table class="chips"><tr><td><div class="chip"><div class="v">${totalFmt}</div><div class="l">Total ARS</div></div></td><td><div class="chip"><div class="v">${gastosGrupo.length}</div><div class="l">Gastos</div></div></td><td><div class="chip"><div class="v">${balancePDF.length}</div><div class="l">Personas</div></div></td></tr></table><h2>Gastos</h2><div class="card"><table><thead><tr><th>Nombre</th><th>Pagador</th><th>Fecha</th><th style="text-align:right">Monto</th><th>Participantes</th></tr></thead><tbody>${filasGastos}</tbody></table></div><p class="total">Total: ${totalFmt} ARS</p><h2>Balance</h2><div class="card"><table><thead><tr><th>Miembro</th><th style="text-align:right">Balance</th></tr></thead><tbody>${filasBalance}</tbody></table></div><h2>A pagar</h2>${seccionDeudas}<div class="footer">Generado con ChePagá · chepaga.app</div></body></html>`;
       const { uri } = await Print.printToFileAsync({ html });
       await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Exportar gastos' });
     } catch (e) {
@@ -389,6 +397,10 @@ export default function DetalleGrupoScreen() {
     );
     actualizarMonedas(id, actualizadas);
   }, [id, grupo?.monedas, actualizarMonedas]);
+
+  useEffect(() => {
+    if (needsRatesFetch()) actualizarTasas();
+  }, [actualizarTasas]);
 
   const monedasDisponiblesParaAgregar = MONEDAS_DISPONIBLES.filter(
     m => !monedasEditando.some(e => e.codigo === m.codigo)
@@ -1085,10 +1097,10 @@ export default function DetalleGrupoScreen() {
               <Text style={styles.popupModalTitulo}>Exportar gastos</Text>
               <Text style={styles.popupModalMensaje}>¿En qué formato querés exportar?</Text>
               <View style={{ width: '100%', gap: 10 }}>
-                <TouchableOpacity style={styles.exportOpcionBtn} onPress={() => { setExportModalVisible(false); mostrarPopup('🚀', 'Próximamente', 'La exportación a Excel estará disponible en la próxima versión.'); }}>
+                <TouchableOpacity style={styles.exportOpcionBtn} onPress={exportarCSV}>
                   <Text style={styles.exportOpcionText}>📊 Exportar como Excel (CSV)</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.exportOpcionBtn, { backgroundColor: '#4A9EFF' }]} onPress={() => { setExportModalVisible(false); mostrarPopup('🚀', 'Próximamente', 'La exportación a PDF estará disponible en la próxima versión.'); }}>
+                <TouchableOpacity style={[styles.exportOpcionBtn, { backgroundColor: '#4A9EFF' }]} onPress={exportarPDF}>
                   <Text style={styles.exportOpcionText}>📄 Exportar como PDF</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.popupModalCancelar, { flex: 0, width: '100%' }]} onPress={() => setExportModalVisible(false)}>
