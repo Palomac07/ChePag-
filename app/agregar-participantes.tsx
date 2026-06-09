@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, Share, ImageBackground } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, ImageBackground } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import ConfirmPopup from '@/components/ConfirmPopup';
 import { supabase } from '@/lib/supabase';
+import { shareViaWhatsApp, shareInvite, copyInviteLink } from '@/lib/invite';
 import { useUserStore } from '@/store/useUserStore';
 import { useGruposStore } from '@/store/useGruposStore';
 import { useAmistadStore } from '@/store/useAmistadStore';
@@ -11,7 +12,6 @@ import { useAmistadStore } from '@/store/useAmistadStore';
 const BG = require('@/assets/images/bg.png');
 const COLORES = ['#9B8EC4', '#7BC4B8', '#6BAED6', '#5BAA9F', '#C084C0', '#4A6580', '#6BAA9F'];
 type UsuarioBusqueda = { id: string; nombre: string; username: string };
-const SCHEME = 'chepaga';
 
 const GLASS = {
   backgroundColor: 'rgba(14,26,52,0.62)',
@@ -67,7 +67,7 @@ export default function AgregarParticipantesScreen() {
     crearGrupo();
   }, []);
 
-  const inviteLink = grupoId ? `${SCHEME}://join/${grupoId}` : null;
+  const [linkCopiado, setLinkCopiado] = useState(false);
 
   const buscarPorUsername = async () => {
     const u = usernameBusqueda.trim().toLowerCase();
@@ -86,16 +86,18 @@ export default function AgregarParticipantesScreen() {
     else setSolicitudesEnviadas(prev => new Set(prev).add(usuarioId));
   };
 
-  const handleInvitarWhatsApp = async () => {
-    const link = inviteLink ?? `${SCHEME}://`;
-    const msg = `¡Hola! Te invito a unirte al grupo "${nombreGrupo}" en ChePaga. Tocá el link para unirte: ${link}`;
-    try { await Share.share({ message: msg }); } catch { }
+  const handleInvitarWhatsApp = () => {
+    if (grupoId) shareViaWhatsApp(nombreGrupo, grupoId);
   };
 
-  const handleInvitarEmail = async () => {
-    const link = inviteLink ?? `${SCHEME}://`;
-    const cuerpo = `¡Hola!\n\nTe invito a unirte al grupo "${nombreGrupo}" en ChePaga.\n\nTocá este link para unirte directamente:\n${link}\n\nSi no tenés la app, primero registrate y después abrí el link.\n\n¡Nos vemos ahí!`;
-    try { await Share.share({ message: cuerpo }); } catch { }
+  const handleCompartir = () => {
+    if (grupoId) shareInvite(nombreGrupo, grupoId);
+  };
+
+  const handleCopiarLink = async () => {
+    if (!grupoId) return;
+    await copyInviteLink(grupoId);
+    setLinkCopiado(true);
   };
 
   const toggleSeleccionado = (usuario: { id: string; nombre: string }) => {
@@ -199,15 +201,20 @@ export default function AgregarParticipantesScreen() {
           </View>
         )}
 
-        <Text style={[styles.seccionLabel, { marginTop: 20 }]}>Invitar al grupo</Text>
-        <TouchableOpacity style={styles.opcionItem} onPress={handleInvitarWhatsApp}>
-          <Ionicons name="share-social-outline" size={20} color="rgba(255,255,255,0.6)" />
+        <Text style={[styles.seccionLabel, { marginTop: 20 }]}>Invitar al grupo con un link</Text>
+        <TouchableOpacity style={styles.opcionItem} onPress={handleInvitarWhatsApp} disabled={!grupoId}>
+          <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
           <Text style={styles.opcionText}>Invitar por WhatsApp</Text>
           <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.3)" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.opcionItem} onPress={handleInvitarEmail}>
-          <Ionicons name="mail-outline" size={20} color="rgba(255,255,255,0.6)" />
-          <Text style={styles.opcionText}>Invitar por Email</Text>
+        <TouchableOpacity style={styles.opcionItem} onPress={handleCopiarLink} disabled={!grupoId}>
+          <Ionicons name={linkCopiado ? 'checkmark' : 'copy-outline'} size={20} color="rgba(255,255,255,0.6)" />
+          <Text style={styles.opcionText}>{linkCopiado ? '¡Link copiado!' : 'Copiar link'}</Text>
+          <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.3)" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.opcionItem} onPress={handleCompartir} disabled={!grupoId}>
+          <Ionicons name="share-social-outline" size={20} color="rgba(255,255,255,0.6)" />
+          <Text style={styles.opcionText}>Compartir por otro medio</Text>
           <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.3)" />
         </TouchableOpacity>
 

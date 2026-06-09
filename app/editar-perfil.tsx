@@ -4,7 +4,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Activi
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import ConfirmPopup from '@/components/ConfirmPopup';
-import { esTelefonoValido, esFechaValida } from '@/utils/validaciones';
+import { esTelefonoValido, esFechaValida, formatearFechaInput } from '@/utils/validaciones';
 import SwipeBackWrapper from '@/components/SwipeBackWrapper';
 import { useUserStore } from '@/store/useUserStore';
 import { supabase } from '@/lib/supabase';
@@ -148,7 +148,7 @@ export default function EditarPerfilScreen() {
               {errores.numero ? <Text style={styles.errorText}>{errores.numero}</Text> : null}
 
               <Text style={styles.label}>Fecha de nacimiento</Text>
-              <TextInput style={[styles.input, errores.fecha && styles.inputError]} value={fecha} onChangeText={v => { setFecha(v); limpiarError('fecha'); }} placeholder="DD/MM/AAAA" placeholderTextColor="rgba(255,255,255,0.35)" keyboardType="numeric" />
+              <TextInput style={[styles.input, errores.fecha && styles.inputError]} value={fecha} onChangeText={v => { setFecha(formatearFechaInput(v)); limpiarError('fecha'); }} placeholder="DD/MM/AAAA" placeholderTextColor="rgba(255,255,255,0.35)" keyboardType="numeric" maxLength={10} />
               {errores.fecha ? <Text style={styles.errorText}>{errores.fecha}</Text> : null}
 
               <Text style={styles.label}>Género</Text>

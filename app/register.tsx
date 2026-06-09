@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { esEmailValido, esTelefonoValido, esFechaValida, esPasswordSegura } from '@/utils/validaciones';
+import { esEmailValido, esTelefonoValido, esFechaValida, esPasswordSegura, formatearFechaInput } from '@/utils/validaciones';
 import { useUserStore } from '@/store/useUserStore';
 import { supabase } from '@/lib/supabase';
 import { getPendingJoinId, setPendingJoinId } from '@/lib/pendingJoin';
@@ -110,7 +110,7 @@ export default function RegisterScreen() {
             {errores.telefono ? <Text style={styles.errorText}>{errores.telefono}</Text> : null}
 
             <Text style={styles.label}>Fecha De Nacimiento</Text>
-            <TextInput style={[styles.input, errores.fecha && styles.inputError]} placeholder="DD/MM/AAAA" placeholderTextColor="rgba(255,255,255,0.35)" value={fecha} onChangeText={v => { setFecha(v); limpiarError('fecha'); }} keyboardType="numeric" />
+            <TextInput style={[styles.input, errores.fecha && styles.inputError]} placeholder="DD/MM/AAAA" placeholderTextColor="rgba(255,255,255,0.35)" value={fecha} onChangeText={v => { setFecha(formatearFechaInput(v)); limpiarError('fecha'); }} keyboardType="numeric" maxLength={10} />
             {errores.fecha ? <Text style={styles.errorText}>{errores.fecha}</Text> : null}
 
             <Text style={styles.label}>Contraseña</Text>

@@ -10,11 +10,12 @@ import { setPendingJoinId } from '@/lib/pendingJoin';
 export default function JoinScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const userId = useUserStore(s => s.id);
-  const nombreUsuario = useUserStore(s => s.nombre);
+  const cargarPerfil = useUserStore(s => s.cargarPerfil);
   const cargarGrupos = useGruposStore(s => s.cargarGrupos);
 
   const [grupo, setGrupo] = useState<{ nombre: string; categoria: string } | null>(null);
+  const [miUid, setMiUid] = useState<string | null>(null);
+  const [miNombre, setMiNombre] = useState('');
   const [cargando, setCargando] = useState(true);
   const [uniendose, setUniendose] = useState(false);
   const [yaEsMiembro, setYaEsMiembro] = useState(false);
@@ -22,31 +23,42 @@ export default function JoinScreen() {
 
   useEffect(() => {
     const cargar = async () => {
-      if (!userId) {
+      // Resolver la sesión real (no solo el store, que en cold-start por deep
+      // link puede estar vacío aunque haya sesión activa de Supabase).
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
         setPendingJoinId(id);
         router.replace('/login');
         return;
       }
+      const uid = session.user.id;
+      setMiUid(uid);
 
+      let nombrePerfil = useUserStore.getState().nombre;
+      if (!nombrePerfil) {
+        await cargarPerfil(uid);
+        nombrePerfil = useUserStore.getState().nombre;
+      }
+      setMiNombre(nombrePerfil);
+
+      // El invitado todavía no es miembro, así que no puede leer la tabla grupos
+      // (RLS scopeada a miembros): usamos una RPC que devuelve solo nombre/categoría.
       const { data: grupoData } = await supabase
-        .from('grupos')
-        .select('nombre, categoria')
-        .eq('id', id)
-        .maybeSingle();
+        .rpc('get_grupo_invite_info', { p_grupo: id })
+        .maybeSingle<{ nombre: string; categoria: string }>();
 
       if (!grupoData) {
         setNoEncontrado(true);
         setCargando(false);
         return;
       }
-
       setGrupo(grupoData);
 
       const { data: membership } = await supabase
         .from('grupo_miembros')
         .select('id')
         .eq('grupo_id', id)
-        .eq('user_id', userId)
+        .eq('user_id', uid)
         .maybeSingle();
 
       setYaEsMiembro(!!membership);
@@ -54,17 +66,18 @@ export default function JoinScreen() {
     };
 
     cargar();
-  }, [id, userId]);
+  }, [id]);
 
   const handleUnirse = async () => {
+    if (!miUid) return;
     setUniendose(true);
     await supabase.from('grupo_miembros').insert({
       grupo_id: id,
-      user_id: userId,
-      nombre: nombreUsuario,
+      user_id: miUid,
+      nombre: miNombre,
       es_admin: false,
     });
-    await cargarGrupos(userId);
+    await cargarGrupos(miUid);
     setUniendose(false);
     router.replace({ pathname: '/detalle-grupo', params: { nombre: grupo?.nombre, id } });
   };

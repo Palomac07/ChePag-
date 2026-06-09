@@ -15,6 +15,9 @@ import * as Print from 'expo-print';
 import { supabase } from '@/lib/supabase';
 import { needsRatesFetch, fetchRatesMap } from '@/lib/ratesCache';
 import { useAmistadStore } from '@/store/useAmistadStore';
+import { getSignedUrl } from '@/lib/ticketImage';
+import { Image } from 'expo-image';
+import InvitarSheet from '@/components/InvitarSheet';
 
 const BG = require('@/assets/images/bg.png');
 
@@ -31,7 +34,7 @@ const MONEDAS_DISPONIBLES: Moneda[] = [
 ];
 
 
-type Gasto = { id: string; nombre: string; pagador: string; pagador_id: string; fecha: string; monto: number; participantes: string[]; moneda: string };
+type Gasto = { id: string; nombre: string; pagador: string; pagador_id: string; fecha: string; monto: number; participantes: string[]; moneda: string; fotoPath: string | null };
 
 function formatearFecha(iso: string): string {
   const d = new Date(iso);
@@ -122,7 +125,20 @@ export default function DetalleGrupoScreen() {
   const eliminarAmigo = useAmistadStore(s => s.eliminarAmigo);
 
   const [gastos, setGastos] = useState<Gasto[]>([]);
+  const [ticketUrl, setTicketUrl] = useState<string | null>(null);
+  const [ticketVisible, setTicketVisible] = useState(false);
+  const [ticketCargando, setTicketCargando] = useState(false);
+  const [invitarVisible, setInvitarVisible] = useState(false);
   const [pagosDB, setPagosDB] = useState<{ de: string; a: string; monto: number }[]>([]);
+
+  const abrirTicket = async (path: string) => {
+    setTicketUrl(null);
+    setTicketCargando(true);
+    setTicketVisible(true);
+    const url = await getSignedUrl(path);
+    setTicketUrl(url);
+    setTicketCargando(false);
+  };
   const [pagosPendientesLocal, setPagosPendientesLocal] = useState<{ de: string; a: string }[]>([]);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
@@ -144,6 +160,7 @@ export default function DetalleGrupoScreen() {
       monto: g.monto,
       participantes: (g.participantes as any[] ?? []).map((p: any) => p.nombre ?? p),
       moneda: g.moneda,
+      fotoPath: g.foto_path ?? null,
     })));
     if (pagosData) setPagosDB(pagosData.map((p: any) => ({ de: p.de_nombre, a: p.a_nombre, monto: p.monto })));
     if (pendientesData) {
@@ -614,6 +631,12 @@ export default function DetalleGrupoScreen() {
                           <View key={p} style={styles.chip}><Text style={styles.chipText}>{p}</Text></View>
                         ))}
                       </View>
+                      {g.fotoPath && (
+                        <TouchableOpacity style={styles.ticketLink} onPress={() => abrirTicket(g.fotoPath!)}>
+                          <Ionicons name="receipt-outline" size={14} color="#4A9EFF" />
+                          <Text style={styles.ticketLinkText}>Ver comprobante</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={styles.cardMonto}>
@@ -733,6 +756,10 @@ export default function DetalleGrupoScreen() {
                 <Text style={styles.agregarMiembroText}>+ Agregar miembro</Text>
               </TouchableOpacity>
             )}
+            <TouchableOpacity style={styles.invitarBtn} onPress={() => setInvitarVisible(true)}>
+              <Ionicons name="share-social-outline" size={18} color="#4A9EFF" />
+              <Text style={styles.invitarBtnText}>Invitar gente con un link</Text>
+            </TouchableOpacity>
             {miembrosGrupo.map((m) => {
               const esAdminMiembro = administradores.includes(m.nombre);
               const esSelf = m.user_id === userId || (!!miNombre && m.nombre === miNombre);
@@ -1157,6 +1184,23 @@ export default function DetalleGrupoScreen() {
             setPopupEliminarAmigo(null);
           }}
         />
+
+        <InvitarSheet visible={invitarVisible} grupoId={id ?? ''} nombreGrupo={nombre ?? 'el grupo'} onClose={() => setInvitarVisible(false)} />
+
+        <Modal transparent animationType="fade" visible={ticketVisible} onRequestClose={() => setTicketVisible(false)}>
+          <View style={styles.ticketModalOverlay}>
+            <TouchableOpacity style={styles.ticketCerrar} onPress={() => setTicketVisible(false)}>
+              <Ionicons name="close" size={26} color="#FFFFFF" />
+            </TouchableOpacity>
+            {ticketCargando ? (
+              <ActivityIndicator color="#FFFFFF" size="large" />
+            ) : ticketUrl ? (
+              <Image source={{ uri: ticketUrl }} style={styles.ticketModalImg} contentFit="contain" />
+            ) : (
+              <Text style={styles.ticketModalError}>No se pudo cargar el comprobante.</Text>
+            )}
+          </View>
+        </Modal>
       </ImageBackground>
     </Animated.View>
   );
@@ -1192,6 +1236,12 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   chip: { backgroundColor: 'rgba(74,158,255,0.12)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
   chipText: { fontSize: 12, color: 'rgba(255,255,255,0.7)' },
+  ticketLink: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10 },
+  ticketLinkText: { fontSize: 13, color: '#4A9EFF', fontWeight: '600' },
+  ticketModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  ticketCerrar: { position: 'absolute', top: 56, right: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  ticketModalImg: { width: '100%', height: '80%' },
+  ticketModalError: { color: 'rgba(255,255,255,0.7)', fontSize: 15 },
   exportarBtn: { backgroundColor: '#4A9EFF', borderRadius: 50, paddingVertical: 14, paddingHorizontal: 28, alignSelf: 'flex-start', marginTop: 8, marginBottom: 8 },
   exportarText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   exportOpcionBtn: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 50, paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center', width: '100%' },
@@ -1246,6 +1296,8 @@ const styles = StyleSheet.create({
   rankingTitulo: { flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.45)', textAlign: 'right' },
   fab: { position: 'absolute', bottom: 90, right: 24, width: 52, height: 52, borderRadius: 26, backgroundColor: '#4A9EFF', alignItems: 'center', justifyContent: 'center', elevation: 4 },
   fabText: { fontSize: 28, color: '#FFFFFF', fontWeight: '700' },
+  invitarBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: 50, marginBottom: 16, backgroundColor: 'rgba(74,158,255,0.12)', borderWidth: 1, borderColor: 'rgba(74,158,255,0.35)' },
+  invitarBtnText: { color: '#4A9EFF', fontSize: 15, fontWeight: '700' },
   miembroCard: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(14,26,52,0.62)', borderRadius: 14, padding: 14, marginBottom: 10,

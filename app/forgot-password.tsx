@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ImageBackground } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ImageBackground, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { esEmailValido } from '@/utils/validaciones';
-import ConfirmPopup from '@/components/ConfirmPopup';
+import { supabase } from '@/lib/supabase';
 
 const BG = require('@/assets/images/bg.png');
 
@@ -11,13 +11,22 @@ export default function ForgotPasswordScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
-  const [popupVisible, setPopupVisible] = useState(false);
+  const [enviando, setEnviando] = useState(false);
 
-  const handleSiguiente = () => {
+  const handleSiguiente = async () => {
     if (!email.trim()) { setError('Ingresá tu email.'); return; }
     if (!esEmailValido(email)) { setError('El formato del email no es válido.'); return; }
     setError('');
-    setPopupVisible(true);
+    setEnviando(true);
+    const correo = email.trim().toLowerCase();
+    const { error: err } = await supabase.auth.resetPasswordForEmail(correo);
+    setEnviando(false);
+    if (err) {
+      setError('No se pudo enviar el email. Esperá unos minutos e intentá de nuevo.');
+      return;
+    }
+    // Por seguridad Supabase no revela si el email existe: siempre vamos al paso del código.
+    router.push({ pathname: '/reset-password', params: { email: correo } });
   };
 
   return (
@@ -30,7 +39,7 @@ export default function ForgotPasswordScreen() {
 
       <View style={styles.content}>
         <Text style={styles.title}>¿Olvidaste tu{'\n'}contraseña?</Text>
-        <Text style={styles.subtitle}>Te mandamos un link a tu email para restablecerla.</Text>
+        <Text style={styles.subtitle}>Te mandamos un código de 6 dígitos a tu email para restablecerla.</Text>
 
         <View style={styles.card}>
           <Text style={styles.label}>Email</Text>
@@ -45,8 +54,8 @@ export default function ForgotPasswordScreen() {
           />
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-          <TouchableOpacity style={styles.button} onPress={handleSiguiente}>
-            <Text style={styles.buttonText}>Enviar link</Text>
+          <TouchableOpacity style={styles.button} onPress={handleSiguiente} disabled={enviando}>
+            {enviando ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Enviar código</Text>}
           </TouchableOpacity>
 
           <View style={styles.registerRow}>
@@ -57,14 +66,6 @@ export default function ForgotPasswordScreen() {
           </View>
         </View>
       </View>
-
-      <ConfirmPopup
-        visible={popupVisible}
-        emoji="📧"
-        titulo="¡Email enviado!"
-        mensaje={`Te mandamos un link para restablecer tu contraseña a ${email}.`}
-        onClose={() => { setPopupVisible(false); router.back(); }}
-      />
     </ImageBackground>
   );
 }

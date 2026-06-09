@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ImageBackground } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ImageBackground, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import ConfirmPopup from '@/components/ConfirmPopup';
 import SwipeBackWrapper from '@/components/SwipeBackWrapper';
 import { esPasswordSegura } from '@/utils/validaciones';
+import { supabase } from '@/lib/supabase';
 
 const BG = require('@/assets/images/bg.png');
 
@@ -18,19 +19,43 @@ export default function SeguridadScreen() {
   const [showConfirmar, setShowConfirmar] = useState(false);
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [popupVisible, setPopupVisible] = useState(false);
+  const [guardando, setGuardando] = useState(false);
 
   const passCheck = esPasswordSegura(nueva);
   const limpiarError = (campo: string) => setErrores(e => ({ ...e, [campo]: '' }));
 
-  const handleCambiar = () => {
+  const handleCambiar = async () => {
     const nuevos: Record<string, string> = {};
     if (!actual) nuevos.actual = 'Ingresá tu contraseña actual.';
     if (!nueva) nuevos.nueva = 'Ingresá la nueva contraseña.';
     else if (!passCheck.valida) nuevos.nueva = 'La contraseña no cumple los requisitos.';
     if (!confirmar) nuevos.confirmar = 'Confirmá la nueva contraseña.';
     else if (nueva !== confirmar) nuevos.confirmar = 'Las contraseñas no coinciden.';
+    if (actual && nueva && actual === nueva) nuevos.nueva = 'La nueva contraseña debe ser distinta de la actual.';
     setErrores(nuevos);
-    if (Object.keys(nuevos).length === 0) setPopupVisible(true);
+    if (Object.keys(nuevos).length > 0) return;
+
+    setGuardando(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.email) {
+      setErrores({ general: 'No se pudo verificar tu sesión. Cerrá sesión e intentá de nuevo.' });
+      setGuardando(false);
+      return;
+    }
+    // Verificar la contraseña actual reautenticando.
+    const { error: signInErr } = await supabase.auth.signInWithPassword({ email: user.email, password: actual });
+    if (signInErr) {
+      setErrores({ actual: 'La contraseña actual es incorrecta.' });
+      setGuardando(false);
+      return;
+    }
+    const { error: updErr } = await supabase.auth.updateUser({ password: nueva });
+    setGuardando(false);
+    if (updErr) {
+      setErrores({ general: 'No se pudo cambiar la contraseña. Intentá de nuevo.' });
+      return;
+    }
+    setPopupVisible(true);
   };
 
   return (
@@ -82,8 +107,10 @@ export default function SeguridadScreen() {
             {errores.confirmar ? <Text style={styles.errorText}>{errores.confirmar}</Text> : null}
           </View>
 
-          <TouchableOpacity style={styles.btn} onPress={handleCambiar}>
-            <Text style={styles.btnText}>Cambiar Contraseña</Text>
+          {errores.general ? <Text style={[styles.errorText, { textAlign: 'center', marginBottom: 8 }]}>{errores.general}</Text> : null}
+
+          <TouchableOpacity style={styles.btn} onPress={handleCambiar} disabled={guardando}>
+            {guardando ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.btnText}>Cambiar Contraseña</Text>}
           </TouchableOpacity>
 
           <View style={{ height: 40 }} />
