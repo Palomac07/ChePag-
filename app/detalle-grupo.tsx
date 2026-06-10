@@ -11,6 +11,7 @@ import { useUserStore } from '@/store/useUserStore';
 import GraficoCircular from '@/components/GraficoCircular';
 import { File, Paths } from 'expo-file-system/next';
 import { StorageAccessFramework, readAsStringAsync, writeAsStringAsync } from 'expo-file-system/legacy';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import { supabase } from '@/lib/supabase';
@@ -22,6 +23,9 @@ import InvitarSheet from '@/components/InvitarSheet';
 import { CHEPAGA_LOGO_DATA_URI } from '@/constants/logoBase64';
 
 const BG = require('@/assets/images/bg.png');
+
+// Carpeta de descargas elegida una sola vez (SAF). Se recuerda para descargar directo después.
+const DOWNLOAD_DIR_KEY = 'chepaga_download_dir_uri';
 
 const TABS = ['A Pagar', 'Gastos', 'Balance', 'Ranking', 'Miembros', 'Presupuesto'];
 
@@ -245,15 +249,24 @@ export default function DetalleGrupoScreen() {
   ) => {
     if (Platform.OS === 'android') {
       try {
-        const perm = await StorageAccessFramework.requestDirectoryPermissionsAsync();
-        if (perm.granted) {
-          const destUri = await StorageAccessFramework.createFileAsync(perm.directoryUri, fileName, mimeType);
+        // Pedimos la carpeta una sola vez; después descargamos directo sin volver a preguntar.
+        let dirUri = await AsyncStorage.getItem(DOWNLOAD_DIR_KEY);
+        if (!dirUri) {
+          const perm = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+          if (perm.granted) {
+            dirUri = perm.directoryUri;
+            await AsyncStorage.setItem(DOWNLOAD_DIR_KEY, dirUri);
+          }
+        }
+        if (dirUri) {
+          const destUri = await StorageAccessFramework.createFileAsync(dirUri, fileName, mimeType);
           await writeAsStringAsync(destUri, contents, { encoding });
-          mostrarPopup('✅', 'Archivo descargado', `Se guardó "${fileName}" en la carpeta que elegiste.`);
+          mostrarPopup('✅', 'Descargado', `"${fileName}" se guardó en tu carpeta de descargas.`);
           return;
         }
       } catch {
-        // Si el usuario cancela o falla la carpeta, caemos a compartir.
+        // La carpeta guardada ya no es válida (borrada o revocada): la olvidamos y compartimos.
+        await AsyncStorage.removeItem(DOWNLOAD_DIR_KEY);
       }
     }
     await Sharing.shareAsync(fileUri, { mimeType, dialogTitle: 'Guardar o compartir' });
