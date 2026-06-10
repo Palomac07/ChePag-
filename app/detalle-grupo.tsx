@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Modal, PanResponder, Animated, Dimensions, Alert, RefreshControl, ActivityIndicator, Keyboard, ImageBackground,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Modal, PanResponder, Animated, Dimensions, Alert, RefreshControl, ActivityIndicator, Keyboard, ImageBackground, Platform,
 } from 'react-native';
 import PagerView from '@/components/PagerViewCompat';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -10,6 +10,7 @@ import { useGruposStore, Moneda } from '@/store/useGruposStore';
 import { useUserStore } from '@/store/useUserStore';
 import GraficoCircular from '@/components/GraficoCircular';
 import { File, Paths } from 'expo-file-system/next';
+import { StorageAccessFramework, readAsStringAsync, writeAsStringAsync } from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import { supabase } from '@/lib/supabase';
@@ -233,9 +234,34 @@ export default function DetalleGrupoScreen() {
   const [monedaHistorial, setMonedaHistorial] = useState('ARS');
   const [exportModalVisible, setExportModalVisible] = useState(false);
 
+  // En Android guarda el archivo en la carpeta que elija el usuario (descarga real).
+  // En iOS abre la hoja de compartir, cuyo "Guardar en Archivos" es la descarga nativa.
+  const guardarArchivo = async (
+    fileUri: string,
+    fileName: string,
+    mimeType: string,
+    contents: string,
+    encoding: 'utf8' | 'base64',
+  ) => {
+    if (Platform.OS === 'android') {
+      try {
+        const perm = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (perm.granted) {
+          const destUri = await StorageAccessFramework.createFileAsync(perm.directoryUri, fileName, mimeType);
+          await writeAsStringAsync(destUri, contents, { encoding });
+          mostrarPopup('✅', 'Archivo descargado', `Se guardó "${fileName}" en la carpeta que elegiste.`);
+          return;
+        }
+      } catch {
+        // Si el usuario cancela o falla la carpeta, caemos a compartir.
+      }
+    }
+    await Sharing.shareAsync(fileUri, { mimeType, dialogTitle: 'Guardar o compartir' });
+  };
+
   const exportarCSV = async () => {
     setExportModalVisible(false);
-    if (!(await Sharing.isAvailableAsync())) {
+    if (Platform.OS !== 'android' && !(await Sharing.isAvailableAsync())) {
       mostrarPopup('ℹ️', 'No disponible', 'La exportación está disponible en la app móvil.');
       return;
     }
@@ -246,11 +272,12 @@ export default function DetalleGrupoScreen() {
         ...gastosGrupo.map(g => [g.nombre, g.pagador, g.fecha, String(g.monto), g.moneda, g.participantes.join(' - ')]),
       ];
       const csv = filas.map(f => f.map(v => `"${v}"`).join(',')).join('\n');
-      const file = new File(Paths.cache, `${nombre ?? 'grupo'}_gastos.csv`);
+      const fileName = `${nombre ?? 'grupo'}_gastos.csv`;
+      const file = new File(Paths.cache, fileName);
       if (file.exists) file.delete();
       file.create();
       file.write(csv);
-      await Sharing.shareAsync(file.uri, { mimeType: 'text/csv', dialogTitle: 'Exportar gastos' });
+      await guardarArchivo(file.uri, fileName, 'text/csv', csv, 'utf8');
     } catch (e) {
       Alert.alert('Error CSV', String(e));
     }
@@ -258,7 +285,7 @@ export default function DetalleGrupoScreen() {
 
   const exportarPDF = async () => {
     setExportModalVisible(false);
-    if (!(await Sharing.isAvailableAsync())) {
+    if (Platform.OS !== 'android' && !(await Sharing.isAvailableAsync())) {
       mostrarPopup('ℹ️', 'No disponible', 'La exportación está disponible en la app móvil.');
       return;
     }
@@ -277,7 +304,8 @@ export default function DetalleGrupoScreen() {
       const totalFmt = `$${Math.round(totalARS).toLocaleString('es-AR')}`;
       const html = `<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>*{box-sizing:border-box;}body{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:28px 26px 36px;color:#1F2A44;background:#fff;}.header{background:#E8F1FB;border:1px solid #D3E2F2;border-radius:18px;padding:22px 18px 20px;text-align:center;}.header img{width:96px;height:96px;display:block;margin:0 auto 6px;border-radius:14px;}.header h1{color:#2B4C8C;font-size:24px;margin:2px 0;font-weight:800;letter-spacing:-0.3px;}.header .sub{color:#6B7A99;font-size:12.5px;margin:0;}.chips{width:100%;border-collapse:separate;border-spacing:10px 0;margin:14px 0 2px;}.chips td{width:33.33%;padding:0;}.chip{background:#F6F9FD;border:1px solid #E6ECF5;border-radius:14px;padding:12px 8px;text-align:center;}.chip .v{font-size:18px;font-weight:800;color:#2B4C8C;}.chip .l{font-size:10px;color:#7385A8;text-transform:uppercase;letter-spacing:0.6px;margin-top:3px;}h2{color:#2B4C8C;font-size:12.5px;text-transform:uppercase;letter-spacing:0.8px;margin:26px 0 10px;padding-left:10px;border-left:4px solid #F5A623;page-break-after:avoid;}.card{border:1px solid #E6ECF5;border-radius:14px;overflow:hidden;}table{width:100%;border-collapse:collapse;font-size:12.5px;}th{background:#E8F1FB;color:#2B4C8C;padding:9px 12px;text-align:left;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:0.4px;}td{padding:9px 12px;border-top:1px solid #EEF2F8;color:#27324D;}tbody tr:nth-child(even){background:#FAFCFE;}tr{page-break-inside:avoid;}.amount{text-align:right;font-weight:600;white-space:nowrap;}.pill{display:inline-block;padding:3px 11px;border-radius:999px;font-weight:700;font-size:12px;}.pill.pos{background:#E7F6EC;color:#1E7A37;}.pill.neg{background:#FCE9E9;color:#C0392B;}.arrow{color:#F5A623;font-weight:800;text-align:center;}.total{font-weight:800;font-size:14px;margin:10px 4px 0;text-align:right;color:#2B4C8C;}.saldado{background:#E7F6EC;color:#1E7A37;border:1px solid #BFE6CB;border-radius:14px;padding:16px;text-align:center;font-weight:700;font-size:13px;}.footer{margin-top:30px;text-align:center;color:#9AA7C2;font-size:10px;border-top:1px solid #EEF2F8;padding-top:12px;}</style></head><body><div class="header"><img src="${CHEPAGA_LOGO_DATA_URI}" alt="ChePagá" /><h1>${nombre ?? 'Grupo'}</h1><p class="sub">Reporte generado el ${fechaReporte}</p></div><table class="chips"><tr><td><div class="chip"><div class="v">${totalFmt}</div><div class="l">Total ARS</div></div></td><td><div class="chip"><div class="v">${gastosGrupo.length}</div><div class="l">Gastos</div></div></td><td><div class="chip"><div class="v">${balancePDF.length}</div><div class="l">Personas</div></div></td></tr></table><h2>Gastos</h2><div class="card"><table><thead><tr><th>Nombre</th><th>Pagador</th><th>Fecha</th><th style="text-align:right">Monto</th><th>Participantes</th></tr></thead><tbody>${filasGastos}</tbody></table></div><p class="total">Total: ${totalFmt} ARS</p><h2>Balance</h2><div class="card"><table><thead><tr><th>Miembro</th><th style="text-align:right">Balance</th></tr></thead><tbody>${filasBalance}</tbody></table></div><h2>A pagar</h2>${seccionDeudas}<div class="footer">Generado con ChePagá · chepaga.app</div></body></html>`;
       const { uri } = await Print.printToFileAsync({ html });
-      await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Exportar gastos' });
+      const base64 = await readAsStringAsync(uri, { encoding: 'base64' });
+      await guardarArchivo(uri, `${nombre ?? 'grupo'}_reporte.pdf`, 'application/pdf', base64, 'base64');
     } catch (e) {
       Alert.alert('Error PDF', String(e));
     }
