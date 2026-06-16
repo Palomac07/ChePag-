@@ -290,6 +290,10 @@ export default function DetalleGrupoScreen() {
         await AsyncStorage.removeItem(DOWNLOAD_DIR_KEY);
       }
     }
+    // iOS: esperar a que el modal de exportar termine de cerrarse antes de presentar
+    // la hoja de compartir. Si se presenta mientras el modal se está cerrando, iOS
+    // descarta la presentación y no aparece nada (el CSV "no se descarga").
+    if (Platform.OS === 'ios') await new Promise(r => setTimeout(r, 500));
     await Sharing.shareAsync(fileUri, { mimeType, dialogTitle: 'Guardar o compartir' });
   };
 
