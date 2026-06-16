@@ -10,6 +10,9 @@ import { useGruposStore } from '@/store/useGruposStore';
 import { useUserStore } from '@/store/useUserStore';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { TourProvider, useTour, useTourTarget } from '@/components/tour/TourProvider';
+
+const TOUR_SEEN_KEY = 'chepaga_tour_seen';
 
 import HomeScreen from './index';
 import GruposScreen from './grupos';
@@ -34,11 +37,35 @@ const TABS: { key: string; icon: IoniconName; iconActive: IoniconName; pageIdx: 
 ];
 
 export default function TabLayout() {
+  return (
+    <TourProvider>
+      <TabsContent />
+    </TourProvider>
+  );
+}
+
+function TabsContent() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const pagerRef = useRef<PagerView>(null);
   const [activeIdx, setActiveIdx] = useState(0);
   const [accionesVisible, setAccionesVisible] = useState(false);
+
+  const { startTour } = useTour();
+  const tourRefs = {
+    home: useTourTarget('tab-home'),
+    grupos: useTourTarget('tab-grupos'),
+    agregar: useTourTarget('tab-add'),
+    notificaciones: useTourTarget('tab-notifs'),
+    perfil: useTourTarget('tab-perfil'),
+  } as Record<string, (node: any) => void>;
+
+  // Tour de bienvenida en el primer ingreso.
+  useEffect(() => {
+    AsyncStorage.getItem(TOUR_SEEN_KEY).then(visto => {
+      if (!visto) { startTour(); AsyncStorage.setItem(TOUR_SEEN_KEY, '1'); }
+    });
+  }, [startTour]);
   const cantidadSolicitudes = useAmistadStore(s => s.solicitudesPendientes.length);
   const cantidadNotifs = useNotificacionesStore(s => s.notificaciones.filter(n => !n.leida).length);
   const totalBadge = cantidadSolicitudes + cantidadNotifs;
@@ -104,11 +131,11 @@ export default function TabLayout() {
                 }}
               >
                 {isAdd ? (
-                  <View style={styles.plusBtn}>
+                  <View ref={tourRefs[tab.key]} style={styles.plusBtn}>
                     <Ionicons name="add" size={26} color="#FFFFFF" />
                   </View>
                 ) : (
-                  <View style={styles.tabIconWrap}>
+                  <View ref={tourRefs[tab.key]} style={styles.tabIconWrap}>
                     <Ionicons
                       name={isActive ? tab.iconActive : tab.icon}
                       size={24}

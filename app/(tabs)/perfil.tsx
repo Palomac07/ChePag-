@@ -7,7 +7,7 @@ import { useUserStore, getGeneroText } from '@/store/useUserStore';
 import { useAmistadStore } from '@/store/useAmistadStore';
 import { useNotificacionesStore } from '@/store/useNotificacionesStore';
 import { supabase } from '@/lib/supabase';
-import OnboardingTour from '@/components/OnboardingTour';
+import { useTour } from '@/components/tour/TourProvider';
 
 const BG = require('@/assets/images/bg.png');
 
@@ -41,11 +41,11 @@ export default function PerfilScreen() {
   const desuscribirNotifs = useNotificacionesStore(s => s.desuscribir);
   const resetNotifs = useNotificacionesStore(s => s.reset);
   const [popupVisible, setPopupVisible] = useState(false);
-  const [tourVisible, setTourVisible] = useState(false);
+  const { startTour } = useTour();
 
   const handleOpcion = (ruta: string | null) => {
     if (ruta === 'logout') { setPopupVisible(true); return; }
-    if (ruta === 'tour') { setTourVisible(true); return; }
+    if (ruta === 'tour') { startTour(); return; }
     if (ruta) router.push(ruta as any);
   };
 
@@ -98,8 +98,6 @@ export default function PerfilScreen() {
         onClose={handleLogout}
         onCancel={() => setPopupVisible(false)}
       />
-
-      <OnboardingTour visible={tourVisible} onClose={() => setTourVisible(false)} />
     </ImageBackground>
   );
 }

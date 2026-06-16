@@ -125,8 +125,13 @@ export const useGruposStore = create<GruposStore>((set, get) => ({
         id || (nombre ? (nombreToId[nombre] ?? `nombre:${nombre}`) : 'desconocido');
 
       const gastos = gastosPorGrupo[g.id] ?? [];
-      const saldos: Record<string, number> = {};
+      const saldos: Record<string, number> = {}; // neto por persona, solo para detectar "saldado"
       let totalARS = 0;
+      // Importes BRUTOS (no se compensan entre sí, igual que la Actividad Reciente):
+      //  - teDebenGross: lo que otros me deben en gastos que pagué yo
+      //  - debesGross:  mi parte en gastos que pagó otro
+      let teDebenGross = 0;
+      let debesGross = 0;
 
       for (const gasto of gastos) {
         const tasa = monedasMap[gasto.moneda] ?? 1;
@@ -137,8 +142,16 @@ export const useGruposStore = create<GruposStore>((set, get) => ({
           typeof p === 'string' ? idDe(p) : idDe(p?.nombre, p?.user_id));
         const parte = partIds.length > 0 ? montoARS / partIds.length : 0;
         const payerId = idDe(gasto.pagador_nombre, gasto.pagador_id);
+
         saldos[payerId] = (saldos[payerId] ?? 0) + montoARS;
         for (const pid of partIds) saldos[pid] = (saldos[pid] ?? 0) - parte;
+
+        const yoParticipo = partIds.includes(userId);
+        if (payerId === userId) {
+          teDebenGross += montoARS - (yoParticipo ? parte : 0); // el resto me debe su parte
+        } else if (yoParticipo) {
+          debesGross += parte; // pagó otro y yo participo: debo mi parte
+        }
       }
 
       for (const pago of pagosPorGrupo[g.id] ?? []) {
@@ -146,12 +159,12 @@ export const useGruposStore = create<GruposStore>((set, get) => ({
         const aId = idDe(pago.a_nombre);
         saldos[deId] = (saldos[deId] ?? 0) + pago.monto;
         saldos[aId] = (saldos[aId] ?? 0) - pago.monto;
+        if (deId === userId) debesGross -= pago.monto;   // salde una deuda
+        if (aId === userId) teDebenGross -= pago.monto;   // me pagaron lo que me debían
       }
 
-      // Mi posición neta en el grupo: positivo => me deben; negativo => debo.
-      const miSaldo = saldos[userId] ?? 0;
-      const teDebenNum = miSaldo > 1 ? miSaldo : 0;
-      const debesNum = miSaldo < -1 ? -miSaldo : 0;
+      const teDebenNum = Math.max(0, Math.round(teDebenGross));
+      const debesNum = Math.max(0, Math.round(debesGross));
 
       const saldado = gastos.length > 0 && Object.values(saldos).every(v => Math.abs(v) <= 1);
 
