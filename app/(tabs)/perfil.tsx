@@ -7,6 +7,7 @@ import { useUserStore, getGeneroText } from '@/store/useUserStore';
 import { useAmistadStore } from '@/store/useAmistadStore';
 import { useNotificacionesStore } from '@/store/useNotificacionesStore';
 import { supabase } from '@/lib/supabase';
+import OnboardingTour from '@/components/OnboardingTour';
 
 const BG = require('@/assets/images/bg.png');
 
@@ -14,6 +15,7 @@ type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const opciones: { label: string; emoji: string; icon: IoniconName; ruta: string }[] = [
   { label: 'Editar Perfil', emoji: '👤', icon: 'person-outline', ruta: '/editar-perfil' },
+  { label: 'Cómo usar ChePagá', emoji: '✨', icon: 'sparkles-outline', ruta: 'tour' },
   { label: 'Seguridad', emoji: '🛡️', icon: 'shield-outline', ruta: '/seguridad' },
   { label: 'Cerrar Sesión', emoji: '🚪', icon: 'log-out-outline', ruta: 'logout' },
 ];
@@ -39,9 +41,11 @@ export default function PerfilScreen() {
   const desuscribirNotifs = useNotificacionesStore(s => s.desuscribir);
   const resetNotifs = useNotificacionesStore(s => s.reset);
   const [popupVisible, setPopupVisible] = useState(false);
+  const [tourVisible, setTourVisible] = useState(false);
 
   const handleOpcion = (ruta: string | null) => {
     if (ruta === 'logout') { setPopupVisible(true); return; }
+    if (ruta === 'tour') { setTourVisible(true); return; }
     if (ruta) router.push(ruta as any);
   };
 
@@ -94,6 +98,8 @@ export default function PerfilScreen() {
         onClose={handleLogout}
         onCancel={() => setPopupVisible(false)}
       />
+
+      <OnboardingTour visible={tourVisible} onClose={() => setTourVisible(false)} />
     </ImageBackground>
   );
 }

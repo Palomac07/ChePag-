@@ -82,7 +82,7 @@ export const useGruposStore = create<GruposStore>((set, get) => ({
         .in('id', grupoIds),
       supabase
         .from('gastos')
-        .select('grupo_id, pagador_nombre, monto, moneda, participantes')
+        .select('grupo_id, pagador_nombre, pagador_id, monto, moneda, participantes')
         .in('grupo_id', grupoIds),
       supabase
         .from('pagos')
@@ -115,7 +115,14 @@ export const useGruposStore = create<GruposStore>((set, get) => ({
       const monedasMap: Record<string, number> = {};
       for (const m of monedas) monedasMap[m.codigo] = m.tasaARS;
 
-      const miNombre = miembros.find((m: any) => m.user_id === userId)?.nombre ?? '';
+      // Saldos por identidad estable (user_id). Antes se calculaba por nombre, pero
+      // el nombre no siempre coincide entre grupo_miembros, el pagador y los
+      // participantes (al editar el perfil no se actualiza grupo_miembros), y por eso
+      // "Debes" quedaba en 0. Colapsamos a user_id cuando existe; si no, al nombre.
+      const nombreToId: Record<string, string> = {};
+      for (const m of miembros) if (m?.nombre) nombreToId[m.nombre] = m.user_id;
+      const idDe = (nombre?: string | null, id?: string | null) =>
+        id || (nombre ? (nombreToId[nombre] ?? `nombre:${nombre}`) : 'desconocido');
 
       const gastos = gastosPorGrupo[g.id] ?? [];
       const saldos: Record<string, number> = {};
@@ -125,45 +132,28 @@ export const useGruposStore = create<GruposStore>((set, get) => ({
         const tasa = monedasMap[gasto.moneda] ?? 1;
         const montoARS = gasto.monto * tasa;
         totalARS += montoARS;
-        const participantes = (gasto.participantes as any[] ?? []).map((p: any) => p.nombre ?? p);
-        const parte = participantes.length > 0 ? montoARS / participantes.length : 0;
-        if (!saldos[gasto.pagador_nombre]) saldos[gasto.pagador_nombre] = 0;
-        saldos[gasto.pagador_nombre] += montoARS;
-        for (const p of participantes) {
-          if (!saldos[p]) saldos[p] = 0;
-          saldos[p] -= parte;
-        }
+        const participantes = (gasto.participantes as any[] ?? []);
+        const partIds = participantes.map((p: any) =>
+          typeof p === 'string' ? idDe(p) : idDe(p?.nombre, p?.user_id));
+        const parte = partIds.length > 0 ? montoARS / partIds.length : 0;
+        const payerId = idDe(gasto.pagador_nombre, gasto.pagador_id);
+        saldos[payerId] = (saldos[payerId] ?? 0) + montoARS;
+        for (const pid of partIds) saldos[pid] = (saldos[pid] ?? 0) - parte;
       }
 
       for (const pago of pagosPorGrupo[g.id] ?? []) {
-        if (!saldos[pago.de_nombre]) saldos[pago.de_nombre] = 0;
-        if (!saldos[pago.a_nombre]) saldos[pago.a_nombre] = 0;
-        saldos[pago.de_nombre] += pago.monto;
-        saldos[pago.a_nombre] -= pago.monto;
+        const deId = idDe(pago.de_nombre);
+        const aId = idDe(pago.a_nombre);
+        saldos[deId] = (saldos[deId] ?? 0) + pago.monto;
+        saldos[aId] = (saldos[aId] ?? 0) - pago.monto;
       }
 
-      const deudores = Object.entries(saldos).filter(([, v]) => v < -1).map(([nombre, monto]) => ({ nombre, monto })).sort((a, b) => a.monto - b.monto);
-      const acreedores = Object.entries(saldos).filter(([, v]) => v > 1).map(([nombre, monto]) => ({ nombre, monto })).sort((a, b) => b.monto - a.monto);
+      // Mi posición neta en el grupo: positivo => me deben; negativo => debo.
+      const miSaldo = saldos[userId] ?? 0;
+      const teDebenNum = miSaldo > 1 ? miSaldo : 0;
+      const debesNum = miSaldo < -1 ? -miSaldo : 0;
 
-      let teDebenNum = 0;
-      let debesNum = 0;
-
-      if (miNombre) {
-        const d = deudores.map(x => ({ ...x }));
-        const a = acreedores.map(x => ({ ...x }));
-        let i = 0, j = 0;
-        while (i < d.length && j < a.length) {
-          const pago = Math.min(-d[i].monto, a[j].monto);
-          if (d[i].nombre === miNombre) debesNum += pago;
-          if (a[j].nombre === miNombre) teDebenNum += pago;
-          d[i].monto += pago;
-          a[j].monto -= pago;
-          if (Math.abs(d[i].monto) < 1) i++;
-          if (Math.abs(a[j].monto) < 1) j++;
-        }
-      }
-
-      const saldado = gastos.length > 0 && deudores.length === 0 && acreedores.length === 0;
+      const saldado = gastos.length > 0 && Object.values(saldos).every(v => Math.abs(v) <= 1);
 
       return {
         id: g.id,

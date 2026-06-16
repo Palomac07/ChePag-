@@ -5,6 +5,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useGruposStore } from '@/store/useGruposStore';
 import { useUserStore } from '@/store/useUserStore';
 import { supabase } from '@/lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import OnboardingTour from '@/components/OnboardingTour';
+
+const TOUR_SEEN_KEY = 'chepaga_tour_seen';
 
 type ActividadItem = {
   id: string;
@@ -36,6 +40,15 @@ export default function HomeScreen() {
 
   const [actividad, setActividad] = useState<ActividadItem[]>([]);
   const userId = useUserStore(s => s.id);
+
+  const [tourVisible, setTourVisible] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(TOUR_SEEN_KEY).then(visto => { if (!visto) setTourVisible(true); });
+  }, []);
+  const cerrarTour = () => {
+    setTourVisible(false);
+    AsyncStorage.setItem(TOUR_SEEN_KEY, '1');
+  };
 
   useEffect(() => {
     if (!grupos.length || !userId) return;
@@ -171,6 +184,8 @@ export default function HomeScreen() {
         </ScrollView>
 
       </Animated.View>
+
+      <OnboardingTour visible={tourVisible} onClose={cerrarTour} />
     </ImageBackground>
   );
 }
