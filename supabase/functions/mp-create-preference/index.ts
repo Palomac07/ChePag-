@@ -63,7 +63,10 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ init_point: prefData.sandbox_init_point ?? prefData.init_point }),
+      JSON.stringify({
+        init_point: prefData.init_point ?? prefData.sandbox_init_point,
+        preference_id: prefData.id,
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (e) {

@@ -129,7 +129,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Actividad Reciente + Mis grupos — esta parte scrollea */}
+        {/* Actividad Reciente */}
         <ScrollView
           style={styles.actividadScroll}
           showsVerticalScrollIndicator={false}
@@ -169,42 +169,6 @@ export default function HomeScreen() {
             ))
           )}
 
-          <Text style={[styles.sectionTitle, styles.sectionTitleGrupos]}>Mis grupos</Text>
-          {grupos.length === 0 ? (
-            <View style={[styles.card, styles.emptyCard]}>
-              <Ionicons name="people-outline" size={28} color="rgba(255,255,255,0.25)" />
-              <Text style={styles.emptyText}>Todavía no estás en ningún grupo</Text>
-            </View>
-          ) : (
-            grupos.map(grupo => (
-              <TouchableOpacity
-                key={grupo.id}
-                style={[styles.grupoCard, !grupo.activo && styles.grupoCardPausado]}
-                activeOpacity={0.75}
-                onPress={() => router.push({ pathname: '/detalle-grupo', params: { id: grupo.id, nombre: grupo.nombre } })}
-              >
-                <View style={styles.grupoAvatars}>
-                  {grupo.avatares.map((letra, i) => (
-                    <View key={i} style={[styles.grupoAvatar, { backgroundColor: grupo.colores[i], marginLeft: i > 0 ? -8 : 0 }]}>
-                      <Text style={styles.grupoAvatarText}>{letra}</Text>
-                    </View>
-                  ))}
-                  {grupo.extras > 0 && (
-                    <View style={[styles.grupoAvatar, { backgroundColor: 'rgba(74,158,255,0.55)', marginLeft: -8 }]}>
-                      <Text style={styles.grupoAvatarText}>+{grupo.extras}</Text>
-                    </View>
-                  )}
-                </View>
-                <View style={styles.grupoInfo}>
-                  <Text style={styles.grupoNombre} numberOfLines={1}>{grupo.nombre}</Text>
-                  <Text style={styles.grupoSub}>
-                    {grupo.participantes} participantes{!grupo.activo ? ' · Pausado' : grupo.saldado ? ' · Saldado' : ''}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.3)" />
-              </TouchableOpacity>
-            ))
-          )}
         </ScrollView>
 
       </Animated.View>
@@ -278,20 +242,6 @@ const styles = StyleSheet.create({
   tipoTeDeben: { color: 'rgba(255,255,255,0.55)' },
   tipoDebes: { color: 'rgba(255,100,100,0.8)' },
   actividadMonto: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
-
-  sectionTitleGrupos: { marginTop: 26 },
-  grupoCard: {
-    ...GLASS,
-    flexDirection: 'row', alignItems: 'center',
-    padding: 14, marginBottom: 10, borderRadius: 16,
-  },
-  grupoCardPausado: { opacity: 0.6 },
-  grupoAvatars: { flexDirection: 'row', marginRight: 12 },
-  grupoAvatar: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(5,8,22,0.8)' },
-  grupoAvatarText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
-  grupoInfo: { flex: 1 },
-  grupoNombre: { fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
-  grupoSub: { fontSize: 12, color: 'rgba(255,255,255,0.42)', marginTop: 2 },
 
   chip: {
     ...GLASS,

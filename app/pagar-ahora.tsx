@@ -65,7 +65,7 @@ export default function PagarAhoraScreen() {
         const verRes = await fetch('https://kzbzyfdvncufrmcavtlx.supabase.co/functions/v1/mp-verificar-pago', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-          body: JSON.stringify({ preference_id: data.preference_id }),
+          body: JSON.stringify({ preference_id: data.preference_id, acreedor_id: acreedorId }),
         });
         const verData = await verRes.json();
         if (verData.aprobado) {
