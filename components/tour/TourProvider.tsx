@@ -33,6 +33,12 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const [running, setRunning] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
+  // Origen (en coords de ventana) del contenedor del overlay. measureInWindow
+  // devuelve coords de ventana, pero el overlay se posiciona respecto a su
+  // contenedor (que en Android queda debajo de la barra de estado). Restamos
+  // este origen para que el spotlight quede alineado en cualquier plataforma.
+  const [origin, setOrigin] = useState({ x: 0, y: 0 });
+  const containerRef = useRef<View>(null);
 
   const show = useCallback((idx: number) => {
     if (idx < 0 || idx >= STEPS.length) { setRunning(false); setRect(null); setStepIdx(0); return; }
@@ -51,7 +57,12 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       }
       node.measureInWindow((x: number, y: number, width: number, height: number) => {
         if ((!width || !height) && attempt < 8) { setTimeout(() => tryMeasure(attempt + 1), 130); return; }
-        setRect({ x, y, width, height });
+        const c: any = containerRef.current;
+        if (c && typeof c.measureInWindow === 'function') {
+          c.measureInWindow((ox: number, oy: number) => { setOrigin({ x: ox || 0, y: oy || 0 }); setRect({ x, y, width, height }); });
+        } else {
+          setRect({ x, y, width, height });
+        }
       });
     };
     tryMeasure(0);
@@ -78,7 +89,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       {children}
 
       {running && (
-        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+        <View ref={containerRef} style={StyleSheet.absoluteFill} pointerEvents="box-none">
           {step?.target == null ? (
             // Tarjeta de bienvenida centrada
             <View style={styles.dimFull}>
@@ -97,7 +108,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
             </View>
           ) : rect ? (
             <Spotlight
-              rect={rect} SW={SW} SH={SH}
+              rect={rect} origin={origin} SW={SW} SH={SH}
               titulo={step.titulo} texto={step.texto}
               stepIdx={stepIdx} total={STEPS.length} isLast={isLast}
               onNext={next} onSkip={stop}
@@ -123,14 +134,17 @@ function Dots({ total, active }: { total: number; active: number }) {
 }
 
 function Spotlight({
-  rect, SW, SH, titulo, texto, stepIdx, total, isLast, onNext, onSkip,
+  rect, origin, SW, SH, titulo, texto, stepIdx, total, isLast, onNext, onSkip,
 }: {
-  rect: Rect; SW: number; SH: number; titulo: string; texto: string;
+  rect: Rect; origin: { x: number; y: number }; SW: number; SH: number; titulo: string; texto: string;
   stepIdx: number; total: number; isLast: boolean; onNext: () => void; onSkip: () => void;
 }) {
   const pad = 10;
-  const hx = Math.max(0, rect.x - pad);
-  const hy = Math.max(0, rect.y - pad);
+  // Coords locales al contenedor del overlay (restamos su origen de ventana).
+  const lx = rect.x - origin.x;
+  const ly = rect.y - origin.y;
+  const hx = Math.max(0, lx - pad);
+  const hy = Math.max(0, ly - pad);
   const hw = rect.width + pad * 2;
   const hh = rect.height + pad * 2;
   const enMitadInferior = rect.y > SH / 2;
@@ -146,8 +160,8 @@ function Spotlight({
       {/* Borde resaltado + captura de toque sobre el objetivo (avanza el tour) */}
       <Pressable onPress={onNext} style={[styles.highlight, { left: hx, top: hy, width: hw, height: hh }]} />
 
-      {/* Tooltip */}
-      <View style={[styles.tooltip, enMitadInferior ? { bottom: SH - hy + 14 } : { top: hy + hh + 14 }]}>
+      {/* Tooltip: arriba del objetivo si está en la mitad inferior (barra de tabs) */}
+      <View style={[styles.tooltip, enMitadInferior ? { bottom: (SH - origin.y) - ly + 14 } : { top: ly + hh + 14 }]}>
         <Text style={styles.titulo}>{titulo}</Text>
         <Text style={styles.texto}>{texto}</Text>
         <Dots total={total} active={stepIdx} />

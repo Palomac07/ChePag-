@@ -40,7 +40,7 @@ const MONEDAS_DISPONIBLES: Moneda[] = [
 ];
 
 
-type Gasto = { id: string; nombre: string; pagador: string; pagador_id: string; fecha: string; monto: number; participantes: string[]; moneda: string; fotoPath: string | null };
+type Gasto = { id: string; nombre: string; pagador: string; pagador_id: string; fecha: string; monto: number; participantes: string[]; participantesData: { id: string; nombre: string }[]; moneda: string; fotoPath: string | null };
 
 function formatearFecha(iso: string): string {
   const d = new Date(iso);
@@ -48,32 +48,51 @@ function formatearFecha(iso: string): string {
   return `${d.getDate()} ${meses[d.getMonth()]}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function calcularBalance(gastos: Gasto[], monedas: Moneda[], pagos: { de: string; a: string; monto: number }[] = []) {
+type MiembroRef = { user_id: string; nombre: string };
+
+// Saldos por identidad estable (user_id) para que un cambio de nombre no parta a
+// una persona en dos. Se devuelve igual { nombre, monto } con el nombre canónico
+// del miembro, así el resto de la pantalla (que matchea por nombre) no cambia.
+function calcularBalance(gastos: Gasto[], monedas: Moneda[], pagos: { de: string; a: string; monto: number }[] = [], miembros: MiembroRef[] = []) {
   const monedasMap: Record<string, Moneda> = {};
   for (const m of monedas) monedasMap[m.codigo] = m;
+
+  const nombreToId: Record<string, string> = {};
+  const idToNombre: Record<string, string> = {};
+  for (const m of miembros) { if (m.nombre) nombreToId[m.nombre] = m.user_id; if (m.user_id) idToNombre[m.user_id] = m.nombre; }
+  for (const g of gastos) {
+    if (g.pagador_id && g.pagador && !idToNombre[g.pagador_id]) idToNombre[g.pagador_id] = g.pagador;
+    if (g.pagador && !nombreToId[g.pagador]) nombreToId[g.pagador] = g.pagador_id || '';
+    for (const p of g.participantesData ?? []) {
+      if (p.id && p.nombre && !idToNombre[p.id]) idToNombre[p.id] = p.nombre;
+      if (p.nombre && !nombreToId[p.nombre]) nombreToId[p.nombre] = p.id || '';
+    }
+  }
+  const idDe = (nombre?: string, id?: string) =>
+    (id && id.length ? id : (nombre ? (nombreToId[nombre] || `n:${nombre}`) : 'desconocido'));
+  const nombreDe = (id: string) => idToNombre[id] || (id.startsWith('n:') ? id.slice(2) : id);
+
   const saldos: Record<string, number> = {};
   for (const g of gastos) {
     const tasa = monedasMap[g.moneda]?.tasaARS ?? 1;
     const montoARS = g.monto * tasa;
-    const parte = montoARS / g.participantes.length;
-    if (!saldos[g.pagador]) saldos[g.pagador] = 0;
-    saldos[g.pagador] += montoARS;
-    for (const p of g.participantes) {
-      if (!saldos[p]) saldos[p] = 0;
-      saldos[p] -= parte;
-    }
+    const partIds = (g.participantesData?.length ? g.participantesData.map(p => idDe(p.nombre, p.id)) : g.participantes.map(n => idDe(n)));
+    const parte = partIds.length ? montoARS / partIds.length : 0;
+    const payerId = idDe(g.pagador, g.pagador_id);
+    saldos[payerId] = (saldos[payerId] ?? 0) + montoARS;
+    for (const pid of partIds) saldos[pid] = (saldos[pid] ?? 0) - parte;
   }
   for (const p of pagos) {
-    if (!saldos[p.de]) saldos[p.de] = 0;
-    if (!saldos[p.a]) saldos[p.a] = 0;
-    saldos[p.de] += p.monto;
-    saldos[p.a] -= p.monto;
+    const deId = idDe(p.de);
+    const aId = idDe(p.a);
+    saldos[deId] = (saldos[deId] ?? 0) + p.monto;
+    saldos[aId] = (saldos[aId] ?? 0) - p.monto;
   }
-  return Object.entries(saldos).map(([nombre, monto]) => ({ nombre, monto: Math.round(monto) }));
+  return Object.entries(saldos).map(([id, monto]) => ({ nombre: nombreDe(id), monto: Math.round(monto) }));
 }
 
-function calcularDeudas(gastos: Gasto[], monedas: Moneda[], pagos: { de: string; a: string; monto: number }[] = []) {
-  const saldos = calcularBalance(gastos, monedas, pagos);
+function calcularDeudas(gastos: Gasto[], monedas: Moneda[], pagos: { de: string; a: string; monto: number }[] = [], miembros: MiembroRef[] = []) {
+  const saldos = calcularBalance(gastos, monedas, pagos, miembros);
   const deudores = saldos.filter(s => s.monto < 0).sort((a, b) => a.monto - b.monto);
   const acreedores = saldos.filter(s => s.monto > 0).sort((a, b) => b.monto - a.monto);
   const deudas: { de: string; a: string; monto: number }[] = [];
@@ -165,6 +184,8 @@ export default function DetalleGrupoScreen() {
       fecha: formatearFecha(g.fecha ?? g.created_at),
       monto: g.monto,
       participantes: (g.participantes as any[] ?? []).map((p: any) => p.nombre ?? p),
+      participantesData: (g.participantes as any[] ?? []).map((p: any) =>
+        typeof p === 'string' ? { id: '', nombre: p } : { id: p.user_id ?? '', nombre: p.nombre ?? '' }),
       moneda: g.moneda,
       fotoPath: g.foto_path ?? null,
     })));
@@ -304,8 +325,8 @@ export default function DetalleGrupoScreen() {
     }
     try {
       const gastosGrupo = gastos;
-      const balancePDF = calcularBalance(gastosGrupo, monedas);
-      const deudasPDF = calcularDeudas(gastosGrupo, monedas);
+      const balancePDF = calcularBalance(gastosGrupo, monedas, [], miembrosGrupo);
+      const deudasPDF = calcularDeudas(gastosGrupo, monedas, [], miembrosGrupo);
       const totalARS = gastosGrupo.reduce((acc, g) => acc + g.monto * (monedasMap[g.moneda]?.tasaARS ?? 1), 0);
       const filasGastos = gastosGrupo.map(g => `<tr><td>${g.nombre}</td><td>${g.pagador}</td><td>${g.fecha}</td><td class="amount">${g.moneda !== 'ARS' ? `${g.moneda} ${g.monto.toLocaleString('es-AR')}` : `$${g.monto.toLocaleString('es-AR')}`}</td><td>${g.participantes.join(', ')}</td></tr>`).join('');
       const filasBalance = balancePDF.map(b => `<tr><td>${b.nombre}</td><td style="text-align:right"><span class="pill ${b.monto >= 0 ? 'pos' : 'neg'}">${b.monto >= 0 ? '+' : '−'}$${Math.abs(b.monto).toLocaleString('es-AR')}</span></td></tr>`).join('');
@@ -406,8 +427,8 @@ export default function DetalleGrupoScreen() {
     mostrarPopup('✅', '¡Configuración guardada!', 'Los cambios fueron aplicados al grupo.');
   };
 
-  const balance = calcularBalance(gastos, monedas, pagosDB);
-  const deudas = calcularDeudas(gastos, monedas, pagosDB);
+  const balance = calcularBalance(gastos, monedas, pagosDB, miembrosGrupo);
+  const deudas = calcularDeudas(gastos, monedas, pagosDB, miembrosGrupo);
 
   const maxMonto = Math.max(...balance.map(b => Math.abs(b.monto)), 1);
   const totalGastado = gastos.reduce((sum: number, g: Gasto) => sum + g.monto * (monedasMap[g.moneda]?.tasaARS ?? 1), 0);
