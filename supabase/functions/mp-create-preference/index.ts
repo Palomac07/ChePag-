@@ -13,6 +13,7 @@ serve(async (req) => {
   try {
     const { monto, descripcion } = await req.json();
     const sellerAccessToken = Deno.env.get('MP_SELLER_ACCESS_TOKEN');
+    const externalReference = `chepaga-${crypto.randomUUID()}`;
 
     if (!sellerAccessToken) {
       return new Response(
@@ -34,6 +35,11 @@ serve(async (req) => {
           unit_price: monto,
           currency_id: 'ARS',
         }],
+        external_reference: externalReference,
+        metadata: {
+          source: 'chepaga',
+          external_reference: externalReference,
+        },
         back_urls: {
           success: 'https://chepaga.app/pago-exitoso',
           failure: 'https://chepaga.app/pago-fallido',
@@ -56,6 +62,7 @@ serve(async (req) => {
       JSON.stringify({
         init_point: prefData.sandbox_init_point ?? prefData.init_point,
         preference_id: prefData.id,
+        external_reference: externalReference,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

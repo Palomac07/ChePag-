@@ -11,10 +11,10 @@ serve(async (req) => {
   }
 
   try {
-    const { preference_id } = await req.json();
+    const { preference_id, external_reference } = await req.json();
     const sellerAccessToken = Deno.env.get('MP_SELLER_ACCESS_TOKEN');
 
-    if (!preference_id) {
+    if (!preference_id && !external_reference) {
       return new Response(
         JSON.stringify({ error: 'Faltan parametros' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -28,8 +28,11 @@ serve(async (req) => {
       );
     }
 
+    const query = external_reference
+      ? `external_reference=${encodeURIComponent(external_reference)}`
+      : `preference_id=${encodeURIComponent(preference_id)}`;
     const mpRes = await fetch(
-      `https://api.mercadopago.com/v1/payments/search?preference_id=${preference_id}`,
+      `https://api.mercadopago.com/v1/payments/search?${query}&sort=date_created&criteria=desc&limit=10`,
       { headers: { 'Authorization': `Bearer ${sellerAccessToken}` } }
     );
 
@@ -38,7 +41,11 @@ serve(async (req) => {
       mpData.results.some((p: any) => p.status === 'approved');
 
     return new Response(
-      JSON.stringify({ aprobado }),
+      JSON.stringify({
+        aprobado,
+        cantidad: Array.isArray(mpData.results) ? mpData.results.length : 0,
+        status: Array.isArray(mpData.results) && mpData.results[0] ? mpData.results[0].status : null,
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (e) {

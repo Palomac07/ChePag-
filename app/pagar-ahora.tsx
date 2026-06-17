@@ -37,6 +37,27 @@ export default function PagarAhoraScreen() {
 
   const montoFinal = tipoMonto === 'total' ? totalDeuda : Number(montoIngresado.replace(/\D/g, ''));
 
+  const verificarPago = async (sessionToken: string | undefined, preferenceId: string, externalReference?: string) => {
+    for (let intento = 0; intento < 8; intento += 1) {
+      if (intento > 0) {
+        await new Promise(resolve => setTimeout(resolve, 8000));
+      }
+
+      const verRes = await fetch('https://kzbzyfdvncufrmcavtlx.supabase.co/functions/v1/mp-verificar-pago', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+        body: JSON.stringify({
+          preference_id: preferenceId,
+          external_reference: externalReference,
+        }),
+      });
+      const verData = await verRes.json();
+      if (verData.aprobado) return true;
+    }
+
+    return false;
+  };
+
   const handlePagar = async () => {
     if (tipoMonto === 'eleccion') {
       if (!montoFinal || montoFinal <= 0) { setError('Ingresá un monto mayor a $0.'); return; }
@@ -59,15 +80,9 @@ export default function PagarAhoraScreen() {
       // Browser cerrado — esperar que MP indexe el pago y verificar
       setPagando(false);
       setVerificando(true);
-      await new Promise(resolve => setTimeout(resolve, 20000));
       try {
-        const verRes = await fetch('https://kzbzyfdvncufrmcavtlx.supabase.co/functions/v1/mp-verificar-pago', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-          body: JSON.stringify({ preference_id: data.preference_id, acreedor_id: acreedorId }),
-        });
-        const verData = await verRes.json();
-        if (verData.aprobado) {
+        const aprobado = await verificarPago(session?.access_token, data.preference_id, data.external_reference);
+        if (aprobado) {
           await supabase.from('notificaciones').insert({
             user_id: acreedorId,
             sender_id: userId,
@@ -85,7 +100,7 @@ export default function PagarAhoraScreen() {
           });
           router.back();
         } else {
-          setError('El pago no se completó. Podés intentarlo de nuevo.');
+          setError('Mercado Pago aprobo el pago, pero ChePaga todavia no pudo confirmarlo. Espera unos segundos y revisa las notificaciones.');
         }
       } catch {
         setError('No se pudo verificar el pago. Revisá tu conexión.');
