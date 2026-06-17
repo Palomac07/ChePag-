@@ -11,9 +11,19 @@ serve(async (req) => {
   }
 
   try {
-    const { monto, descripcion } = await req.json();
+    const { monto, descripcion, return_url } = await req.json();
     const sellerAccessToken = Deno.env.get('MP_SELLER_ACCESS_TOKEN');
     const externalReference = `chepaga-${crypto.randomUUID()}`;
+    const mpReturnBase = 'https://kzbzyfdvncufrmcavtlx.supabase.co/functions/v1/mp-return';
+
+    const buildReturnUrl = (resultado: string) => {
+      const url = new URL(mpReturnBase);
+      url.searchParams.set('resultado', resultado);
+      if (typeof return_url === 'string' && return_url.trim()) {
+        url.searchParams.set('redirect', return_url);
+      }
+      return url.toString();
+    };
 
     if (!sellerAccessToken) {
       return new Response(
@@ -41,8 +51,9 @@ serve(async (req) => {
           external_reference: externalReference,
         },
         back_urls: {
-          success: 'https://chepaga.app/pago-exitoso',
-          failure: 'https://chepaga.app/pago-fallido',
+          success: buildReturnUrl('success'),
+          failure: buildReturnUrl('failure'),
+          pending: buildReturnUrl('pending'),
         },
         auto_return: 'approved',
       }),

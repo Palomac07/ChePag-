@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, Keyboard, TouchableWithoutFeedback, ActivityIndicator, ImageBackground } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { useUserStore } from '@/store/useUserStore';
 
 const BG = require('@/assets/images/bg.png');
+
+WebBrowser.maybeCompleteAuthSession();
 
 const GLASS = {
   backgroundColor: 'rgba(14,26,52,0.62)',
@@ -38,9 +41,12 @@ export default function PagarAhoraScreen() {
   const montoFinal = tipoMonto === 'total' ? totalDeuda : Number(montoIngresado.replace(/\D/g, ''));
 
   const verificarPago = async (sessionToken: string | undefined, preferenceId: string, externalReference?: string) => {
-    for (let intento = 0; intento < 8; intento += 1) {
+    let ultimoStatus: string | null = null;
+    let cantidad = 0;
+
+    for (let intento = 0; intento < 5; intento += 1) {
       if (intento > 0) {
-        await new Promise(resolve => setTimeout(resolve, 8000));
+        await new Promise(resolve => setTimeout(resolve, 5000));
       }
 
       const verRes = await fetch('https://kzbzyfdvncufrmcavtlx.supabase.co/functions/v1/mp-verificar-pago', {
@@ -52,10 +58,12 @@ export default function PagarAhoraScreen() {
         }),
       });
       const verData = await verRes.json();
-      if (verData.aprobado) return true;
+      ultimoStatus = verData.status ?? null;
+      cantidad = Number(verData.cantidad ?? 0);
+      if (verData.aprobado) return { aprobado: true, cantidad, status: ultimoStatus };
     }
 
-    return false;
+    return { aprobado: false, cantidad, status: ultimoStatus };
   };
 
   const handlePagar = async () => {
@@ -67,22 +75,48 @@ export default function PagarAhoraScreen() {
     setPagando(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      const returnUrl = Linking.createURL('pago-mp');
       const res = await fetch('https://kzbzyfdvncufrmcavtlx.supabase.co/functions/v1/mp-create-preference', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ acreedor_id: acreedorId, monto: montoFinal, descripcion: `Pago a ${acreedorNombre} - ChePaga` }),
+        body: JSON.stringify({
+          acreedor_id: acreedorId,
+          monto: montoFinal,
+          descripcion: `Pago a ${acreedorNombre} - ChePaga`,
+          return_url: returnUrl,
+        }),
       });
       const data = await res.json();
       if (!data.init_point) { setError(data.error ?? 'No se pudo crear el pago.'); setPagando(false); return; }
 
-      await WebBrowser.openBrowserAsync(data.init_point);
+      const browserResult = await WebBrowser.openAuthSessionAsync(data.init_point, returnUrl);
 
       // Browser cerrado — esperar que MP indexe el pago y verificar
       setPagando(false);
+
+      if (browserResult.type !== 'success') {
+        setError('No se completo el pago en Mercado Pago.');
+        return;
+      }
+
+      const resultUrl = new URL(browserResult.url);
+      const resultado = resultUrl.searchParams.get('resultado');
+      const mpStatus = resultUrl.searchParams.get('collection_status') || resultUrl.searchParams.get('status');
+
+      if (resultado === 'failure' || mpStatus === 'rejected') {
+        setError('El pago fue rechazado o cancelado en Mercado Pago.');
+        return;
+      }
+
+      if (resultado === 'pending' || mpStatus === 'pending' || mpStatus === 'in_process') {
+        setError('El pago quedo pendiente en Mercado Pago. Cuando se apruebe, volve a intentar la confirmacion.');
+        return;
+      }
+
       setVerificando(true);
       try {
-        const aprobado = await verificarPago(session?.access_token, data.preference_id, data.external_reference);
-        if (aprobado) {
+        const verificacion = await verificarPago(session?.access_token, data.preference_id, data.external_reference);
+        if (verificacion.aprobado) {
           await supabase.from('notificaciones').insert({
             user_id: acreedorId,
             sender_id: userId,
@@ -99,8 +133,10 @@ export default function PagarAhoraScreen() {
             },
           });
           router.back();
+        } else if (verificacion.cantidad === 0) {
+          setError('No se registro ningun pago en Mercado Pago.');
         } else {
-          setError('Mercado Pago aprobo el pago, pero ChePaga todavia no pudo confirmarlo. Espera unos segundos y revisa las notificaciones.');
+          setError('No pudimos confirmar el pago todavia. Si lo completaste, espera unos segundos y revisa las notificaciones.');
         }
       } catch {
         setError('No se pudo verificar el pago. Revisá tu conexión.');
