@@ -44,6 +44,7 @@ export default function EditarPerfilScreen() {
       if (data.telefono) setNumero(data.telefono);
       if (data.fecha_nacimiento) setFecha(data.fecha_nacimiento);
       if (data.genero) setGenero(data.genero);
+      setMpVinculado(!!data.mp_user_id);
     }
     setCargandoPerfil(false);
   }, []);

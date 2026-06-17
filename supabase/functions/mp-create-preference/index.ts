@@ -45,15 +45,11 @@ serve(async (req) => {
           unit_price: monto,
           currency_id: 'ARS',
         }],
-        back_urls: {
-          success: 'https://chepaga.app/pago-exitoso',
-          failure: 'https://chepaga.app/pago-fallido',
-        },
-        auto_return: 'approved',
       }),
     });
 
     const prefData = await prefRes.json();
+    console.log('MP preference response:', JSON.stringify(prefData));
 
     if (!prefData.sandbox_init_point && !prefData.init_point) {
       return new Response(
@@ -64,7 +60,7 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        init_point: prefData.init_point ?? prefData.sandbox_init_point,
+        init_point: prefData.sandbox_init_point ?? prefData.init_point,
         preference_id: prefData.id,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -60,7 +60,7 @@ export default function PagarAhoraScreen() {
       // Browser cerrado — esperar que MP indexe el pago y verificar
       setPagando(false);
       setVerificando(true);
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise(resolve => setTimeout(resolve, 20000));
       try {
         const verRes = await fetch('https://kzbzyfdvncufrmcavtlx.supabase.co/functions/v1/mp-verificar-pago', {
           method: 'POST',
