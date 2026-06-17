@@ -1,15 +1,114 @@
-import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, ScrollView } from 'react-native';
+import { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ImageBackground, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
+import * as WebBrowser from 'expo-web-browser';
+import { supabase } from '@/lib/supabase';
+import { useUserStore } from '@/store/useUserStore';
+import ConfirmPopup from '@/components/ConfirmPopup';
 
 const BG = require('@/assets/images/bg.png');
+const MP_CLIENT_ID = '5984405886470464';
+const SUPABASE_URL = 'https://kzbzyfdvncufrmcavtlx.supabase.co';
+const REDIRECT_URI = `${SUPABASE_URL}/functions/v1/mp-callback`;
 
-const SELLER_USER_ID = '3293275618';
-const BUYER_USER_ID = '3293418914';
-const BUYER_USERNAME = 'TESTUSER8912732514848919820';
+const SELLER = {
+  title: 'Cuenta vendedora',
+  use: 'Para revisar cobros / plata recibida',
+  userId: '3293275618',
+  username: 'TESTUSER2549126361532013130',
+  password: 'MXaPfGaTGb',
+  code: '275618',
+};
+
+const BUYER = {
+  title: 'Cuenta compradora',
+  use: 'Para pagar en el checkout sandbox',
+  userId: '3293418914',
+  username: 'TESTUSER8912732514848919820',
+  password: 'BoBTDsaSlK',
+  code: '418914',
+};
 
 export default function VincularMPScreen() {
   const router = useRouter();
+  const userId = useUserStore(s => s.id);
+  const cargarPerfil = useUserStore(s => s.cargarPerfil);
+  const [cargando, setCargando] = useState(false);
+  const [popup, setPopup] = useState<{ visible: boolean; titulo: string; mensaje: string }>({
+    visible: false,
+    titulo: '',
+    mensaje: '',
+  });
+
+  const showPopup = (titulo: string, mensaje: string) => {
+    setPopup({ visible: true, titulo, mensaje });
+  };
+
+  const copiar = async (label: string, value: string) => {
+    await Clipboard.setStringAsync(value);
+    showPopup('Copiado', `${label} copiado al portapapeles.`);
+  };
+
+  const vincular = async () => {
+    setCargando(true);
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const currentUserId = authUser?.id || userId;
+      if (!currentUserId) {
+        showPopup('Error', 'No se pudo identificar tu cuenta. Cerra sesion e intenta de nuevo.');
+        setCargando(false);
+        return;
+      }
+
+      const authUrl =
+        `https://auth.mercadopago.com/authorization` +
+        `?client_id=${MP_CLIENT_ID}` +
+        `&response_type=code` +
+        `&platform_id=mp` +
+        `&state=${currentUserId}` +
+        `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, 'chepaga://mp-callback');
+      if (result.type !== 'success') {
+        showPopup('Cancelado', `El proceso fue cancelado (tipo: ${result.type}).`);
+        setCargando(false);
+        return;
+      }
+
+      const url = new URL(result.url);
+      const errorParam = url.searchParams.get('error');
+      const success = url.searchParams.get('success');
+
+      if (errorParam) {
+        showPopup('Error de MP', decodeURIComponent(errorParam));
+        setCargando(false);
+        return;
+      }
+
+      if (success === 'true') {
+        await cargarPerfil(currentUserId);
+        showPopup('Cuenta vinculada', 'Tu cuenta de Mercado Pago quedo conectada a ChePaga.');
+      } else {
+        showPopup('Error', `Respuesta inesperada: ${result.url}`);
+      }
+    } catch (e) {
+      showPopup('Error', String(e));
+    }
+    setCargando(false);
+  };
+
+  const CredentialCard = ({ account }: { account: typeof SELLER }) => (
+    <View style={styles.card}>
+      <Text style={styles.pasosTitulo}>{account.title}</Text>
+      <Text style={styles.cardDescLeft}>{account.use}</Text>
+      <CopyRow label="Usuario" value={account.username} onCopy={copiar} />
+      <CopyRow label="Contrasena" value={account.password} onCopy={copiar} />
+      <CopyRow label="Codigo" value={account.code} onCopy={copiar} />
+      <CopyRow label="User ID" value={account.userId} onCopy={copiar} />
+    </View>
+  );
 
   return (
     <ImageBackground source={BG} style={styles.root} resizeMode="cover" imageStyle={{ transform: [{ scale: 1.08 }] }}>
@@ -24,52 +123,59 @@ export default function VincularMPScreen() {
       <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent}>
         <View style={[styles.card, { alignItems: 'center', paddingVertical: 28 }]}>
           <Ionicons name="card-outline" size={44} color="#4A9EFF" style={{ marginBottom: 12 }} />
-          <Text style={styles.cardTitulo}>Cuenta fija de ChePaga</Text>
+          <Text style={styles.cardTitulo}>Cuentas de prueba</Text>
           <Text style={styles.cardDesc}>
-            En modo prueba todos los cobros se crean con una unica cuenta vendedora sandbox configurada en Supabase.
+            Usa comprador para pagar. Usa vendedor para revisar la plata recibida. Podes copiar cada dato y pegarlo en Mercado Pago.
           </Text>
         </View>
 
+        <CredentialCard account={BUYER} />
+        <CredentialCard account={SELLER} />
+
         <View style={styles.card}>
-          <Text style={styles.pasosTitulo}>Para cobrar</Text>
+          <Text style={styles.pasosTitulo}>Vincular Mercado Pago</Text>
           <Text style={styles.cardDescLeft}>
-            No hace falta vincular Mercado Pago por usuario. La app usa la cuenta vendedora sandbox de ChePaga.
+            Si queres probar el flujo anterior de vinculacion por usuario, toca el boton e inicia sesion en Mercado Pago.
           </Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Vendedor user id</Text>
-            <Text style={styles.infoValue}>{SELLER_USER_ID}</Text>
-          </View>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.pasosTitulo}>Para pagar</Text>
-          {[
-            'Cerrá sesión de Mercado Pago y Mercado Libre en el navegador del celular.',
-            'Abrí el pago desde ChePaga.',
-            'En el checkout sandbox, iniciá sesión con la cuenta compradora de prueba.',
-            'No uses la cuenta vendedora para confirmar pagos.',
-          ].map((paso, i) => (
-            <View key={i} style={styles.pasoRow}>
-              <View style={styles.pasoNum}><Text style={styles.pasoNumText}>{i + 1}</Text></View>
-              <Text style={styles.paso}>{paso}</Text>
-            </View>
-          ))}
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Comprador user id</Text>
-            <Text style={styles.infoValue}>{BUYER_USER_ID}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Usuario comprador</Text>
-            <Text style={styles.infoValue}>{BUYER_USERNAME}</Text>
-          </View>
+          <TouchableOpacity style={styles.mpBtn} onPress={vincular} disabled={cargando}>
+            {cargando
+              ? <ActivityIndicator color="#FFFFFF" />
+              : <Text style={styles.mpBtnText}>Vincular con Mercado Pago</Text>
+            }
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.nota}>
-          La contraseña y el codigo de verificacion de las cuentas de prueba se comparten por fuera del codigo para no dejarlos publicados en GitHub.
+          En el flujo sandbox compartido, los pagos de ChePaga se crean con la cuenta vendedora fija configurada en Supabase.
         </Text>
       </ScrollView>
+
+      <ConfirmPopup
+        visible={popup.visible}
+        emoji="i"
+        titulo={popup.titulo}
+        mensaje={popup.mensaje}
+        onClose={() => {
+          const wasLinked = popup.titulo === 'Cuenta vinculada';
+          setPopup(p => ({ ...p, visible: false }));
+          if (wasLinked) router.back();
+        }}
+      />
     </ImageBackground>
+  );
+}
+
+function CopyRow({ label, value, onCopy }: { label: string; value: string; onCopy: (label: string, value: string) => void }) {
+  return (
+    <View style={styles.infoRow}>
+      <View style={styles.infoText}>
+        <Text style={styles.infoLabel}>{label}</Text>
+        <Text style={styles.infoValue} selectable>{value}</Text>
+      </View>
+      <TouchableOpacity style={styles.copyBtn} onPress={() => onCopy(label, value)}>
+        <Ionicons name="copy-outline" size={18} color="#FFFFFF" />
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -91,20 +197,30 @@ const styles = StyleSheet.create({
   cardTitulo: { fontSize: 18, fontWeight: '700', color: '#FFFFFF', marginBottom: 10, textAlign: 'center' },
   cardDesc: { fontSize: 14, color: 'rgba(255,255,255,0.55)', textAlign: 'center', lineHeight: 20 },
   cardDescLeft: { fontSize: 14, color: 'rgba(255,255,255,0.62)', lineHeight: 20, marginBottom: 16 },
-  pasosTitulo: { fontSize: 15, fontWeight: '700', color: '#FFFFFF', marginBottom: 16 },
-  pasoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
-  pasoNum: { width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(74,158,255,0.25)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  pasoNumText: { color: '#4A9EFF', fontSize: 12, fontWeight: '700' },
-  paso: { fontSize: 14, color: 'rgba(255,255,255,0.72)', lineHeight: 20, flex: 1 },
+  pasosTitulo: { fontSize: 15, fontWeight: '700', color: '#FFFFFF', marginBottom: 8 },
   infoRow: {
     backgroundColor: 'rgba(255,255,255,0.07)',
     borderRadius: 12,
-    padding: 14,
+    padding: 12,
     marginTop: 10,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
+  infoText: { flex: 1 },
   infoLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 12, marginBottom: 4 },
   infoValue: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  copyBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(74,158,255,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mpBtn: { backgroundColor: '#009EE3', borderRadius: 50, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
+  mpBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   nota: { fontSize: 12, color: 'rgba(255,255,255,0.42)', textAlign: 'center', lineHeight: 18 },
 });
