@@ -16,7 +16,7 @@ export default function ConfirmPopup({ visible, emoji, titulo, mensaje, onClose,
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel ?? onClose}>
       <View style={styles.overlay}>
         <View style={styles.popup}>
-          <Text style={styles.emoji}>{emoji}</Text>
+          {emoji ? <Text style={styles.emoji}>{emoji}</Text> : null}
           <Text style={styles.titulo}>{titulo}</Text>
           <Text style={styles.mensaje}>{mensaje}</Text>
           <View style={onCancel ? styles.botones : styles.botonesUnico}>

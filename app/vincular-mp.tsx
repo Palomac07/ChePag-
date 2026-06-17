@@ -16,19 +16,15 @@ const REDIRECT_URI = `${SUPABASE_URL}/functions/v1/mp-callback`;
 const SELLER = {
   title: 'Cuenta vendedora',
   use: 'Para revisar cobros / plata recibida',
-  userId: '3293275618',
   username: 'TESTUSER2549126361532013130',
   password: 'MXaPfGaTGb',
-  code: '275618',
 };
 
 const BUYER = {
   title: 'Cuenta compradora',
   use: 'Para pagar en el checkout sandbox',
-  userId: '3293418914',
   username: 'TESTUSER8912732514848919820',
   password: 'BoBTDsaSlK',
-  code: '418914',
 };
 
 export default function VincularMPScreen() {
@@ -105,8 +101,6 @@ export default function VincularMPScreen() {
       <Text style={styles.cardDescLeft}>{account.use}</Text>
       <CopyRow label="Usuario" value={account.username} onCopy={copiar} />
       <CopyRow label="Contrasena" value={account.password} onCopy={copiar} />
-      <CopyRow label="Codigo" value={account.code} onCopy={copiar} />
-      <CopyRow label="User ID" value={account.userId} onCopy={copiar} />
     </View>
   );
 
@@ -152,7 +146,7 @@ export default function VincularMPScreen() {
 
       <ConfirmPopup
         visible={popup.visible}
-        emoji="i"
+        emoji=""
         titulo={popup.titulo}
         mensaje={popup.mensaje}
         onClose={() => {
