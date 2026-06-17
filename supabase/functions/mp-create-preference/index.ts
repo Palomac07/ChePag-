@@ -1,5 +1,4 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,23 +11,13 @@ serve(async (req) => {
   }
 
   try {
-    const { acreedor_id, monto, descripcion } = await req.json();
+    const { monto, descripcion } = await req.json();
+    const sellerAccessToken = Deno.env.get('MP_SELLER_ACCESS_TOKEN');
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
-
-    const { data: perfil } = await supabase
-      .from('profiles')
-      .select('mp_access_token, nombre')
-      .eq('id', acreedor_id)
-      .single();
-
-    if (!perfil?.mp_access_token) {
+    if (!sellerAccessToken) {
       return new Response(
-        JSON.stringify({ error: 'El receptor no tiene Mercado Pago vinculado' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Falta configurar MP_SELLER_ACCESS_TOKEN en Supabase' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -36,7 +25,7 @@ serve(async (req) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${perfil.mp_access_token}`,
+        'Authorization': `Bearer ${sellerAccessToken}`,
       },
       body: JSON.stringify({
         items: [{

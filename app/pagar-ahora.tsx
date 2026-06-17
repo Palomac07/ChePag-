@@ -31,10 +31,9 @@ export default function PagarAhoraScreen() {
   const [verificando, setVerificando] = useState(false);
 
   useEffect(() => {
-    if (!acreedorId) { setCargando(false); setMpVinculado(false); return; }
-    supabase.from('profiles').select('mp_user_id').eq('id', acreedorId).maybeSingle()
-      .then(({ data }) => { setMpVinculado(!!data?.mp_user_id); setCargando(false); });
-  }, [acreedorId]);
+    setMpVinculado(true);
+    setCargando(false);
+  }, []);
 
   const montoFinal = tipoMonto === 'total' ? totalDeuda : Number(montoIngresado.replace(/\D/g, ''));
 
