@@ -19,17 +19,6 @@ const iconoPorTipo: Record<string, string> = {
   presupuesto_alcanzado: '🚨',
 };
 
-const GLASS = {
-  backgroundColor: 'rgba(14,26,52,0.62)',
-  borderWidth: 1,
-  borderColor: 'rgba(255,255,255,0.1)',
-  borderRadius: 16,
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.3,
-  shadowRadius: 10,
-} as const;
-
 export default function NotificacionesScreen() {
   const { solicitudesPendientes, solicitudesEnviadas, responderSolicitud, cargarSolicitudes, cargarSolicitudesEnviadas } = useAmistadStore();
   const { notificaciones, cargar, confirmarPago, rechazarPago, marcarTodasLeidas } = useNotificacionesStore();
@@ -182,20 +171,27 @@ const styles = StyleSheet.create({
   header: { paddingTop: 72, paddingHorizontal: 24, paddingBottom: 20, alignItems: 'center' },
   title: { fontSize: 22, fontWeight: '700', color: '#FFFFFF' },
   body: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 8 },
+  scrollContent: { paddingTop: 8, paddingBottom: 24 },
 
   emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, paddingBottom: 60 },
   emptyEmoji: { fontSize: 48, marginBottom: 16 },
   emptyTitulo: { fontSize: 18, fontWeight: '700', color: '#FFFFFF', marginBottom: 8 },
   emptyDesc: { fontSize: 14, color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 20 },
 
-  seccionLabel: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.45)', marginBottom: 10, letterSpacing: 0.5, textTransform: 'uppercase' },
+  seccionLabel: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.45)', marginBottom: 2, marginTop: 4, paddingHorizontal: 20, letterSpacing: 0.5, textTransform: 'uppercase' },
 
-  card: { ...GLASS, flexDirection: 'row', alignItems: 'center', padding: 14, marginBottom: 10 },
-  cardNoLeida: { borderLeftWidth: 3, borderLeftColor: '#4A9EFF' },
-  avatarCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.12)',
+  },
+  cardNoLeida: { backgroundColor: 'rgba(74,158,255,0.05)' },
+  avatarCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
   avatarLetra: { color: '#FFFFFF', fontWeight: '700', fontSize: 18 },
-  iconoCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(74,158,255,0.15)', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  iconoCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(74,158,255,0.15)', alignItems: 'center', justifyContent: 'center', marginRight: 14 },
   iconoEmoji: { fontSize: 22 },
   cardInfo: { flex: 1, marginRight: 8 },
   cardTitulo: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
