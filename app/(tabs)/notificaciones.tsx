@@ -143,6 +143,11 @@ export default function NotificacionesScreen() {
                     <View style={styles.cardInfo}>
                       <Text style={styles.cardTitulo}>{n.titulo}</Text>
                       <Text style={styles.cardMensaje}>{n.mensaje}</Text>
+                      {n.tipo === 'pago_pendiente' && n.data?.monto ? (
+                        <Text style={styles.pagoParcialText}>
+                          Se descontara solo ${Number(n.data.monto).toLocaleString('es-AR')} de la deuda.
+                        </Text>
+                      ) : null}
                     </View>
                     {n.tipo === 'pago_pendiente' && !n.leida && (
                       <View style={styles.botonesRow}>
@@ -195,6 +200,7 @@ const styles = StyleSheet.create({
   cardInfo: { flex: 1, marginRight: 8 },
   cardTitulo: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
   cardMensaje: { fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 2, lineHeight: 18 },
+  pagoParcialText: { fontSize: 12, color: '#34D399', marginTop: 6, lineHeight: 16, fontWeight: '600' },
 
   botonesRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   btnAceptar: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(52,211,153,0.25)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(52,211,153,0.5)' },
