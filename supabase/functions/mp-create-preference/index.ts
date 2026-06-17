@@ -45,6 +45,11 @@ serve(async (req) => {
           unit_price: monto,
           currency_id: 'ARS',
         }],
+        back_urls: {
+          success: 'https://chepaga.app/pago-exitoso',
+          failure: 'https://chepaga.app/pago-fallido',
+        },
+        auto_return: 'approved',
       }),
     });
 
