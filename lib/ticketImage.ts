@@ -48,6 +48,13 @@ export async function uploadTicket(
   return path;
 }
 
+// Borra una imagen del bucket privado. Devuelve true si se borró (o no había nada que borrar).
+export async function deleteTicket(path: string, bucket = 'tickets'): Promise<boolean> {
+  if (!path) return true;
+  const { error } = await supabase.storage.from(bucket).remove([path]);
+  return !error;
+}
+
 // Genera una URL firmada temporal para mostrar una imagen privada, o null si falla.
 export async function getSignedUrl(
   path: string,

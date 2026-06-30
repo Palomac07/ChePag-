@@ -17,6 +17,7 @@ const iconoPorTipo: Record<string, string> = {
   pago_confirmado: '✅',
   recordatorio_deuda: '⏰',
   presupuesto_alcanzado: '🚨',
+  removido_grupo: '👋',
 };
 
 const GLASS = {

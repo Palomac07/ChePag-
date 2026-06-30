@@ -56,6 +56,7 @@ type GruposStore = {
   actualizarMonedas: (id: string, monedas: Moneda[]) => Promise<void>;
   hacerAdmin: (grupoId: string, userId: string) => Promise<void>;
   quitarAdmin: (grupoId: string, userId: string) => Promise<void>;
+  eliminarMiembro: (grupoId: string, userId: string) => Promise<boolean>;
   guardarPresupuesto: (id: string, monto: number) => Promise<void>;
 };
 
@@ -253,6 +254,25 @@ export const useGruposStore = create<GruposStore>((set, get) => ({
         };
       }),
     }));
+  },
+
+  eliminarMiembro: async (grupoId, userId) => {
+    const { error } = await supabase.from('grupo_miembros').delete().eq('grupo_id', grupoId).eq('user_id', userId);
+    if (error) return false;
+    set(state => ({
+      grupos: state.grupos.map(g => {
+        if (g.id !== grupoId) return g;
+        const miembro = g.miembros.find(m => m.user_id === userId);
+        const miembros = g.miembros.filter(m => m.user_id !== userId);
+        return {
+          ...g,
+          miembros,
+          participantes: miembros.length,
+          administradores: miembro ? g.administradores.filter(a => a !== miembro.nombre) : g.administradores,
+        };
+      }),
+    }));
+    return true;
   },
 
   guardarPresupuesto: async (id, monto) => {

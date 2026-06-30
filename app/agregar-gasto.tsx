@@ -9,7 +9,7 @@ import { useGruposStore } from '@/store/useGruposStore';
 import { useUserStore } from '@/store/useUserStore';
 import { supabase } from '@/lib/supabase';
 import { needsRatesFetch, fetchRatesMap } from '@/lib/ratesCache';
-import { pickFromCamera, pickFromGallery, uploadTicket, type ImagenElegida } from '@/lib/ticketImage';
+import { pickFromCamera, pickFromGallery, uploadTicket, getSignedUrl, deleteTicket, type ImagenElegida } from '@/lib/ticketImage';
 
 const BG = require('@/assets/images/bg.png');
 
@@ -26,7 +26,14 @@ const INPUT = {
 
 export default function AgregarGastoScreen() {
   const router = useRouter();
-  const { grupoId: grupoIdParam } = useLocalSearchParams<{ grupoId?: string }>();
+  const params = useLocalSearchParams<{
+    grupoId?: string; modo?: string; gastoId?: string;
+    nombreGasto?: string; monto?: string; moneda?: string; categoria?: string;
+    pagadorId?: string; pagadorNombre?: string; participantes?: string; fotoPath?: string;
+  }>();
+  const grupoIdParam = params.grupoId;
+  const esEdicion = params.modo === 'editar';
+  const gastoId = params.gastoId;
   const categoriaStore = useGastoStore(s => s.categoriaSeleccionada);
   const resetCategoria = useGastoStore(s => s.resetCategoria);
   const grupos = useGruposStore(s => s.grupos);
@@ -41,9 +48,31 @@ export default function AgregarGastoScreen() {
   useEffect(() => {
     if (grupoIdParam) {
       const g = grupos.find(gr => gr.id === grupoIdParam);
-      if (g) { setGrupoSeleccionado(g.nombre); setMonedaSeleccionada(g.monedas[0]?.codigo ?? 'ARS'); }
+      // En edición no pisamos la moneda elegida del gasto con la moneda por defecto del grupo.
+      if (g) { setGrupoSeleccionado(g.nombre); if (!esEdicion) setMonedaSeleccionada(g.monedas[0]?.codigo ?? 'ARS'); }
     }
-  }, [grupoIdParam, grupos]);
+  }, [grupoIdParam, grupos, esEdicion]);
+
+  // Precarga los datos del gasto cuando entramos en modo edición (una sola vez).
+  const [prefillHecho, setPrefillHecho] = useState(false);
+  useEffect(() => {
+    if (!esEdicion || prefillHecho) return;
+    setNombreGasto(params.nombreGasto ?? '');
+    setMonto(params.monto ?? '');
+    setMonedaSeleccionada(params.moneda ?? 'ARS');
+    setCategoria(params.categoria ?? '');
+    if (params.pagadorId) setPagadorId(params.pagadorId);
+    if (params.pagadorNombre) setPagadorNombre(params.pagadorNombre);
+    try {
+      const parts = JSON.parse(params.participantes ?? '[]');
+      if (Array.isArray(parts)) setMiembrosSeleccionados(parts);
+    } catch { /* participantes inválidos: se dejan vacíos */ }
+    if (params.fotoPath) {
+      setFotoPathExistente(params.fotoPath);
+      getSignedUrl(params.fotoPath).then(u => setFotoExistenteUrl(u));
+    }
+    setPrefillHecho(true);
+  }, [esEdicion, prefillHecho]);
 
   const [grupoSeleccionado, setGrupoSeleccionado] = useState('');
   const [grupoDropdown, setGrupoDropdown] = useState(false);
@@ -60,6 +89,8 @@ export default function AgregarGastoScreen() {
   const [popupVisible, setPopupVisible] = useState(false);
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [foto, setFoto] = useState<ImagenElegida | null>(null);
+  const [fotoPathExistente, setFotoPathExistente] = useState<string | null>(null);
+  const [fotoExistenteUrl, setFotoExistenteUrl] = useState<string | null>(null);
   const [fotoSourceModal, setFotoSourceModal] = useState(false);
   const [permisoDenegado, setPermisoDenegado] = useState(false);
 
@@ -110,7 +141,7 @@ export default function AgregarGastoScreen() {
   const validarYGuardar = async () => {
     const nuevosErrores: Record<string, string> = {};
     if (!grupoSeleccionado) nuevosErrores.grupo = 'Seleccioná un grupo.';
-    if (presupuestoAlcanzado) nuevosErrores.grupo = `El grupo alcanzó su presupuesto de $${grupoActual!.presupuesto!.toLocaleString('es-AR')}.`;
+    if (presupuestoAlcanzado && !esEdicion) nuevosErrores.grupo = `El grupo alcanzó su presupuesto de $${grupoActual!.presupuesto!.toLocaleString('es-AR')}.`;
     if (!nombreGasto.trim()) nuevosErrores.nombre = 'Ingresá el nombre del gasto.';
     if (!monto || Number(monto) <= 0) nuevosErrores.monto = 'Ingresá un monto mayor a $0.';
     if (miembrosSeleccionados.length === 0) nuevosErrores.miembros = 'Seleccioná al menos un participante.';
@@ -121,23 +152,39 @@ export default function AgregarGastoScreen() {
     setGuardando(true);
     const grupoId = grupoActual!.id;
 
-    let fotoPath: string | null = null;
+    // Path del comprobante: si se eligió una foto nueva la subimos; si no,
+    // conservamos la existente (puede ser null si se quitó en edición).
+    let fotoPath: string | null = fotoPathExistente;
     if (foto) {
-      fotoPath = await uploadTicket(userId, grupoId, foto.base64);
-      if (!fotoPath) {
+      const subido = await uploadTicket(userId, grupoId, foto.base64);
+      if (!subido) {
         setGuardando(false);
         setErrores({ general: 'No se pudo subir la imagen del ticket. Intentá de nuevo.' });
         return;
       }
+      fotoPath = subido;
     }
 
-    const { error } = await supabase.from('gastos').insert({
+    const datosGasto = {
       grupo_id: grupoId, nombre: nombreGasto.trim(),
       pagador_id: pagadorId, pagador_nombre: pagadorNombre,
       monto: Number(monto), moneda: monedaSeleccionada,
       participantes: miembrosSeleccionados.map(m => ({ user_id: m.user_id, nombre: m.nombre })),
       categoria, foto_path: fotoPath,
-    });
+    };
+
+    if (esEdicion) {
+      const { error } = await supabase.from('gastos').update(datosGasto).eq('id', gastoId);
+      setGuardando(false);
+      if (error) { setErrores({ general: 'No se pudo guardar el gasto. Intentá de nuevo.' }); return; }
+      // Si el comprobante original cambió o se quitó, borramos el viejo del storage.
+      const original = params.fotoPath || null;
+      if (original && original !== fotoPath) deleteTicket(original);
+      setPopupVisible(true);
+      return;
+    }
+
+    const { error } = await supabase.from('gastos').insert(datosGasto);
     setGuardando(false);
     if (error) { setErrores({ general: 'No se pudo guardar el gasto. Intentá de nuevo.' }); return; }
 
@@ -178,7 +225,7 @@ export default function AgregarGastoScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={22} color="rgba(255,255,255,0.8)" />
           </TouchableOpacity>
-          <Text style={styles.title}>Agregar Gasto</Text>
+          <Text style={styles.title}>{esEdicion ? 'Editar Gasto' : 'Agregar Gasto'}</Text>
           <View style={{ width: 40 }} />
         </View>
 
@@ -297,16 +344,18 @@ export default function AgregarGastoScreen() {
             {errores.categoria ? <Text style={styles.errorText}>{errores.categoria}</Text> : null}
           </View>
 
-          {foto ? (
+          {foto || fotoPathExistente ? (
             <View style={styles.ticketPreviewWrap}>
-              <Image source={{ uri: foto.uri }} style={styles.ticketPreview} contentFit="cover" />
+              {(foto?.uri || fotoExistenteUrl) && (
+                <Image source={{ uri: foto?.uri ?? fotoExistenteUrl! }} style={styles.ticketPreview} contentFit="cover" />
+              )}
               <View style={styles.ticketPreviewInfo}>
                 <Text style={styles.ticketPreviewLabel}>Comprobante adjunto</Text>
                 <View style={{ flexDirection: 'row', gap: 16, marginTop: 6 }}>
                   <TouchableOpacity onPress={() => setFotoSourceModal(true)}>
                     <Text style={styles.ticketPreviewAction}>Cambiar</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setFoto(null)}>
+                  <TouchableOpacity onPress={() => { setFoto(null); setFotoPathExistente(null); setFotoExistenteUrl(null); }}>
                     <Text style={[styles.ticketPreviewAction, { color: '#FF4D4D' }]}>Quitar</Text>
                   </TouchableOpacity>
                 </View>
@@ -322,13 +371,13 @@ export default function AgregarGastoScreen() {
           {errores.general ? <Text style={[styles.errorText, { textAlign: 'center', marginBottom: 12 }]}>{errores.general}</Text> : null}
 
           <TouchableOpacity style={styles.guardarBtn} onPress={validarYGuardar} disabled={guardando}>
-            {guardando ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.guardarText}>Guardar Gasto</Text>}
+            {guardando ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.guardarText}>{esEdicion ? 'Guardar cambios' : 'Guardar Gasto'}</Text>}
           </TouchableOpacity>
 
           <View style={{ height: 40 }} />
         </ScrollView>
 
-        <ConfirmPopup visible={popupVisible} emoji="✅" titulo="¡Gasto agregado!" mensaje="El gasto fue registrado y los balances del grupo se actualizaron." onClose={() => { setPopupVisible(false); router.back(); }} />
+        <ConfirmPopup visible={popupVisible} emoji="✅" titulo={esEdicion ? '¡Gasto actualizado!' : '¡Gasto agregado!'} mensaje={esEdicion ? 'Los cambios se guardaron y los balances del grupo se actualizaron.' : 'El gasto fue registrado y los balances del grupo se actualizaron.'} onClose={() => { setPopupVisible(false); router.back(); }} />
         <ConfirmPopup visible={permisoDenegado} emoji="🔒" titulo="Permiso necesario" mensaje="Para adjuntar el comprobante, habilitá el acceso a la cámara o las fotos desde la configuración de tu teléfono." onClose={() => setPermisoDenegado(false)} />
 
         <Modal transparent animationType="fade" visible={fotoSourceModal} onRequestClose={() => setFotoSourceModal(false)}>

@@ -17,8 +17,8 @@ import * as Print from 'expo-print';
 import { supabase } from '@/lib/supabase';
 import { needsRatesFetch, fetchRatesMap } from '@/lib/ratesCache';
 import { useAmistadStore } from '@/store/useAmistadStore';
-import { getSignedUrl } from '@/lib/ticketImage';
-import { Image } from 'expo-image';
+import { getSignedUrl, deleteTicket } from '@/lib/ticketImage';
+import ZoomableImage from '@/components/ZoomableImage';
 import InvitarSheet from '@/components/InvitarSheet';
 import { CHEPAGA_LOGO_DATA_URI } from '@/constants/logoBase64';
 
@@ -40,7 +40,7 @@ const MONEDAS_DISPONIBLES: Moneda[] = [
 ];
 
 
-type Gasto = { id: string; nombre: string; pagador: string; pagador_id: string; fecha: string; monto: number; participantes: string[]; participantesData: { id: string; nombre: string }[]; moneda: string; fotoPath: string | null };
+type Gasto = { id: string; nombre: string; pagador: string; pagador_id: string; fecha: string; monto: number; participantes: string[]; participantesData: { id: string; nombre: string }[]; moneda: string; fotoPath: string | null; categoria: string };
 
 function formatearFecha(iso: string): string {
   const d = new Date(iso);
@@ -131,6 +131,7 @@ export default function DetalleGrupoScreen() {
   const actualizarMonedas = useGruposStore(s => s.actualizarMonedas);
   const hacerAdmin = useGruposStore(s => s.hacerAdmin);
   const quitarAdmin = useGruposStore(s => s.quitarAdmin);
+  const eliminarMiembro = useGruposStore(s => s.eliminarMiembro);
   const grupoPausado = useGruposStore(s => s.grupos.find(g => g.id === id)?.activo === false);
 
   const userId = useUserStore(s => s.id);
@@ -167,6 +168,10 @@ export default function DetalleGrupoScreen() {
   const [pagosPendientesLocal, setPagosPendientesLocal] = useState<{ de: string; a: string }[]>([]);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
+  const [gastoAEliminar, setGastoAEliminar] = useState<Gasto | null>(null);
+  const [eliminandoGasto, setEliminandoGasto] = useState(false);
+  const [miembroAEliminar, setMiembroAEliminar] = useState<MiembroRef | null>(null);
+  const [eliminandoMiembro, setEliminandoMiembro] = useState(false);
 
   const cargarDatos = useCallback(async (esRefresh = false) => {
     if (!id) return;
@@ -188,6 +193,7 @@ export default function DetalleGrupoScreen() {
         typeof p === 'string' ? { id: '', nombre: p } : { id: p.user_id ?? '', nombre: p.nombre ?? '' }),
       moneda: g.moneda,
       fotoPath: g.foto_path ?? null,
+      categoria: g.categoria ?? '',
     })));
     if (pagosData) setPagosDB(pagosData.map((p: any) => ({ de: p.de_nombre, a: p.a_nombre, monto: p.monto })));
     if (pendientesData) {
@@ -472,6 +478,71 @@ export default function DetalleGrupoScreen() {
     m => !monedasEditando.some(e => e.codigo === m.codigo)
   );
 
+  // Solo el pagador del gasto o un admin del grupo pueden editar/eliminar.
+  const puedeModificarGasto = (g: Gasto) => !grupoPausado && (g.pagador_id === userId || esAdmin);
+
+  const handleEditarGasto = (g: Gasto) => {
+    router.push({
+      pathname: '/agregar-gasto',
+      params: {
+        modo: 'editar',
+        gastoId: g.id,
+        grupoId: id ?? '',
+        nombreGasto: g.nombre,
+        monto: String(g.monto),
+        moneda: g.moneda,
+        categoria: g.categoria,
+        pagadorId: g.pagador_id,
+        pagadorNombre: g.pagador,
+        participantes: JSON.stringify(g.participantesData.map(p => ({ user_id: p.id, nombre: p.nombre }))),
+        fotoPath: g.fotoPath ?? '',
+      },
+    });
+  };
+
+  const handleEliminarGasto = async () => {
+    const g = gastoAEliminar;
+    if (!g || eliminandoGasto) return;
+    setEliminandoGasto(true);
+    const { error } = await supabase.from('gastos').delete().eq('id', g.id);
+    setEliminandoGasto(false);
+    if (error) {
+      setGastoAEliminar(null);
+      mostrarPopup('❌', 'Error', 'No se pudo eliminar el gasto. Intentá de nuevo.');
+      return;
+    }
+    if (g.fotoPath) deleteTicket(g.fotoPath); // borrado del comprobante en segundo plano
+    setGastos(prev => prev.filter(x => x.id !== g.id));
+    setGastoAEliminar(null);
+    mostrarPopup('🗑️', 'Gasto eliminado', `"${g.nombre}" fue eliminado y los balances se actualizaron.`);
+  };
+
+  // Un admin puede expulsar a cualquier miembro (incluido otro admin), menos al
+  // creador del grupo y menos a sí mismo (para eso está "Salir del grupo").
+  const puedeEliminarMiembro = (m: MiembroRef) =>
+    esAdmin && !grupoPausado && m.user_id !== userId && m.user_id !== grupo?.creador_id;
+
+  const handleEliminarMiembro = async () => {
+    const m = miembroAEliminar;
+    if (!m || eliminandoMiembro || !id) return;
+    setEliminandoMiembro(true);
+    const ok = await eliminarMiembro(id, m.user_id);
+    if (ok) {
+      await supabase.from('notificaciones').insert({
+        user_id: m.user_id,
+        sender_id: userId,
+        tipo: 'removido_grupo',
+        titulo: 'Te quitaron de un grupo',
+        mensaje: `Un administrador te quitó del grupo "${nombre ?? ''}".`,
+        data: { grupo_id: id, grupo_nombre: nombre },
+      });
+    }
+    setEliminandoMiembro(false);
+    setMiembroAEliminar(null);
+    if (ok) mostrarPopup('👋', 'Miembro eliminado', `${m.nombre} ya no forma parte del grupo.`);
+    else mostrarPopup('❌', 'Error', 'No se pudo eliminar al miembro. Intentá de nuevo.');
+  };
+
   const handleMarcarPagado = async (item: { de: string; a: string; monto: number }) => {
     const acreedorMiembro = miembrosGrupo.find(m => m.nombre === item.a);
     const deudorMiembro = miembrosGrupo.find(m => m.nombre === item.de);
@@ -727,6 +798,18 @@ export default function DetalleGrupoScreen() {
                       )}
                     </View>
                   </View>
+                  {puedeModificarGasto(g) && (
+                    <View style={styles.gastoAcciones}>
+                      <TouchableOpacity style={styles.gastoAccionBtn} onPress={() => handleEditarGasto(g)}>
+                        <Ionicons name="create-outline" size={15} color="#4A9EFF" />
+                        <Text style={styles.gastoAccionText}>Editar</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.gastoAccionBtn} onPress={() => setGastoAEliminar(g)}>
+                        <Ionicons name="trash-outline" size={15} color="#FF6B6B" />
+                        <Text style={[styles.gastoAccionText, { color: '#FF6B6B' }]}>Eliminar</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               );
             })}
@@ -898,6 +981,12 @@ export default function DetalleGrupoScreen() {
                           <Text style={styles.agregarAmigoText}>+ Amigo</Text>
                         </TouchableOpacity>
                       )
+                    )}
+                    {puedeEliminarMiembro(m) && (
+                      <TouchableOpacity style={styles.expulsarBtn} onPress={() => setMiembroAEliminar({ user_id: m.user_id, nombre: m.nombre })}>
+                        <Ionicons name="person-remove-outline" size={13} color="#FF6B6B" />
+                        <Text style={styles.expulsarText}>Expulsar</Text>
+                      </TouchableOpacity>
                     )}
                   </View>
                 </View>
@@ -1265,6 +1354,26 @@ export default function DetalleGrupoScreen() {
 
         <InvitarSheet visible={invitarVisible} grupoId={id ?? ''} nombreGrupo={nombre ?? 'el grupo'} onClose={() => setInvitarVisible(false)} />
 
+        <ConfirmPopup
+          visible={!!gastoAEliminar}
+          emoji="🗑️"
+          titulo="¿Eliminar gasto?"
+          mensaje={`Se eliminará "${gastoAEliminar?.nombre ?? ''}" y los balances del grupo se recalcularán. Esta acción no se puede deshacer.`}
+          confirmText={eliminandoGasto ? 'Eliminando...' : 'Eliminar'}
+          onCancel={() => { if (!eliminandoGasto) setGastoAEliminar(null); }}
+          onClose={handleEliminarGasto}
+        />
+
+        <ConfirmPopup
+          visible={!!miembroAEliminar}
+          emoji="👋"
+          titulo="¿Eliminar miembro?"
+          mensaje={`${miembroAEliminar?.nombre ?? ''} dejará de formar parte del grupo. Sus gastos registrados se mantienen en el historial.`}
+          confirmText={eliminandoMiembro ? 'Eliminando...' : 'Expulsar'}
+          onCancel={() => { if (!eliminandoMiembro) setMiembroAEliminar(null); }}
+          onClose={handleEliminarMiembro}
+        />
+
         <Modal transparent animationType="fade" visible={ticketVisible} onRequestClose={() => setTicketVisible(false)}>
           <View style={styles.ticketModalOverlay}>
             <TouchableOpacity style={styles.ticketCerrar} onPress={() => setTicketVisible(false)}>
@@ -1273,7 +1382,10 @@ export default function DetalleGrupoScreen() {
             {ticketCargando ? (
               <ActivityIndicator color="#FFFFFF" size="large" />
             ) : ticketUrl ? (
-              <Image source={{ uri: ticketUrl }} style={styles.ticketModalImg} contentFit="contain" />
+              <>
+                <ZoomableImage uri={ticketUrl} style={styles.ticketModalImg} />
+                <Text style={styles.ticketModalHint}>Pellizcá o tocá dos veces para hacer zoom</Text>
+              </>
             ) : (
               <Text style={styles.ticketModalError}>No se pudo cargar el comprobante.</Text>
             )}
@@ -1316,9 +1428,15 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 12, color: 'rgba(255,255,255,0.7)' },
   ticketLink: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10 },
   ticketLinkText: { fontSize: 13, color: '#4A9EFF', fontWeight: '600' },
+  gastoAcciones: { flexDirection: 'row', justifyContent: 'flex-end', gap: 18, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)' },
+  gastoAccionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  gastoAccionText: { fontSize: 13, color: '#4A9EFF', fontWeight: '600' },
+  expulsarBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 50, borderWidth: 1, borderColor: 'rgba(255,107,107,0.4)', backgroundColor: 'rgba(255,107,107,0.12)' },
+  expulsarText: { fontSize: 13, color: '#FF6B6B', fontWeight: '600' },
   ticketModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center', padding: 16 },
   ticketCerrar: { position: 'absolute', top: 56, right: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
   ticketModalImg: { width: '100%', height: '80%' },
+  ticketModalHint: { color: 'rgba(255,255,255,0.45)', fontSize: 12, marginTop: 14, textAlign: 'center' },
   ticketModalError: { color: 'rgba(255,255,255,0.7)', fontSize: 15 },
   exportarBtn: { backgroundColor: '#4A9EFF', borderRadius: 50, paddingVertical: 14, paddingHorizontal: 28, alignSelf: 'flex-start', marginTop: 8, marginBottom: 8 },
   exportarText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
