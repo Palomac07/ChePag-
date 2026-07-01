@@ -132,6 +132,7 @@ export default function DetalleGrupoScreen() {
   const hacerAdmin = useGruposStore(s => s.hacerAdmin);
   const quitarAdmin = useGruposStore(s => s.quitarAdmin);
   const eliminarMiembro = useGruposStore(s => s.eliminarMiembro);
+  const actualizarRanking = useGruposStore(s => s.actualizarRanking);
   const grupoPausado = useGruposStore(s => s.grupos.find(g => g.id === id)?.activo === false);
 
   const userId = useUserStore(s => s.id);
@@ -142,6 +143,7 @@ export default function DetalleGrupoScreen() {
   const administradores = grupo?.administradores ?? [];
   const esAdmin = miembrosGrupo.some(m => m.user_id === userId && m.es_admin) || (!!miNombre && administradores.includes(miNombre));
   const esCreador = grupo?.creador_id === userId;
+  const rankingActivo = grupo?.rankingActivo !== false;
 
   const amigosStore = useAmistadStore(s => s.amigos);
   const solicitudesEnviadasStore = useAmistadStore(s => s.solicitudesEnviadas);
@@ -258,6 +260,7 @@ export default function DetalleGrupoScreen() {
   const [conversionAbierta, setConversionAbierta] = useState<number | null>(null);
   const [configVisible, setConfigVisible] = useState(false);
   const [monedasEditando, setMonedasEditando] = useState<Moneda[]>([]);
+  const [rankingEditando, setRankingEditando] = useState(true);
   const [tasasInput, setTasasInput] = useState<Record<string, string>>({});
   const [agregarMonedaOpen, setAgregarMonedaOpen] = useState(false);
   const [errorConfig, setErrorConfig] = useState('');
@@ -381,6 +384,7 @@ export default function DetalleGrupoScreen() {
     }
     setTasasInput(inputs);
     setTasasModo(modos);
+    setRankingEditando(rankingActivo);
     setAgregarMonedaOpen(false);
     setErrorConfig('');
     setMenuVisible(false);
@@ -432,13 +436,36 @@ export default function DetalleGrupoScreen() {
       tasaARS: m.codigo === 'ARS' ? 1 : Number(tasasInput[m.codigo]),
       tasaAuto: m.codigo !== 'ARS' ? tasasModo[m.codigo] !== 'manual' : undefined,
     }));
-    if (id) actualizarMonedas(id, guardadas);
+    if (id) {
+      actualizarMonedas(id, guardadas);
+      actualizarRanking(id, rankingEditando);
+    }
+    if (!rankingEditando && tabActivo === 'Ranking') {
+      setTabActivo(TABS[balanceIndex]);
+      pagerRef.current?.setPage(balanceIndex);
+    }
     setConfigVisible(false);
     mostrarPopup('✅', '¡Configuración guardada!', 'Los cambios fueron aplicados al grupo.');
   };
 
   const balance = calcularBalance(gastos, monedas, pagosDB, miembrosGrupo);
   const deudas = calcularDeudas(gastos, monedas, pagosDB, miembrosGrupo);
+  const rankingIndex = TABS.indexOf('Ranking');
+  const balanceIndex = TABS.indexOf('Balance');
+
+  const avisarRankingDesactivado = () => {
+    mostrarPopup('', 'Ranking desactivado', 'El ranking esta desactivado para este grupo. Podes activarlo desde la configuracion del grupo.');
+  };
+
+  const irATab = (tab: string) => {
+    const index = TABS.indexOf(tab);
+    if (tab === 'Ranking' && !rankingActivo) {
+      avisarRankingDesactivado();
+      return;
+    }
+    setTabActivo(tab);
+    pagerRef.current?.setPage(index);
+  };
 
   const maxMonto = Math.max(...balance.map(b => Math.abs(b.monto)), 1);
   const totalGastado = gastos.reduce((sum: number, g: Gasto) => sum + g.monto * (monedasMap[g.moneda]?.tasaARS ?? 1), 0);
@@ -634,12 +661,15 @@ export default function DetalleGrupoScreen() {
 
         <View style={styles.tabsContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-            {TABS.map((tab) => (
-              <TouchableOpacity key={tab} onPress={() => { setTabActivo(tab); pagerRef.current?.setPage(TABS.indexOf(tab)); }} style={styles.tabBtn}>
-                <Text style={[styles.tabText, tabActivo === tab && styles.tabTextActivo]}>{tab}</Text>
+            {TABS.map((tab) => {
+              const desactivado = tab === 'Ranking' && !rankingActivo;
+              return (
+              <TouchableOpacity key={tab} onPress={() => irATab(tab)} style={styles.tabBtn}>
+                <Text style={[styles.tabText, tabActivo === tab && styles.tabTextActivo, desactivado && styles.tabTextDesactivado]}>{tab}</Text>
                 {tabActivo === tab && <View style={styles.tabUnderline} />}
               </TouchableOpacity>
-            ))}
+              );
+            })}
           </ScrollView>
         </View>
 
@@ -647,7 +677,16 @@ export default function DetalleGrupoScreen() {
           ref={pagerRef}
           style={{ flex: 1 }}
           initialPage={1}
-          onPageSelected={e => setTabActivo(TABS[e.nativeEvent.position])}
+          onPageSelected={e => {
+            const index = e.nativeEvent.position;
+            if (index === rankingIndex && !rankingActivo) {
+              avisarRankingDesactivado();
+              setTabActivo(TABS[balanceIndex]);
+              pagerRef.current?.setPage(balanceIndex);
+              return;
+            }
+            setTabActivo(TABS[index]);
+          }}
         >
 
           {/* A Pagar */}
@@ -1196,6 +1235,30 @@ export default function DetalleGrupoScreen() {
                   </>
                 )}
 
+                <Text style={[styles.configSeccionTitulo, { marginTop: 28 }]}>Ranking del grupo</Text>
+                <View style={styles.configSwitchRow}>
+                  <View style={styles.configSwitchTextWrap}>
+                    <Text style={styles.configSwitchTitulo}>Mostrar ranking</Text>
+                    <Text style={styles.configSwitchDesc}>
+                      Si esta desactivado, nadie puede entrar al ranking de este grupo.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[
+                      styles.configSwitch,
+                      rankingEditando && styles.configSwitchActivo,
+                      !esAdmin && styles.configSwitchDisabled,
+                    ]}
+                    onPress={() => esAdmin && setRankingEditando(prev => !prev)}
+                    disabled={!esAdmin}
+                  >
+                    <View style={[styles.configSwitchThumb, rankingEditando && styles.configSwitchThumbActivo]} />
+                  </TouchableOpacity>
+                </View>
+                {!esAdmin && (
+                  <Text style={styles.configNota}>Solo los administradores pueden cambiar el ranking.</Text>
+                )}
+
                 <Text style={[styles.configSeccionTitulo, { marginTop: 28 }]}>Administradores</Text>
                 {!esAdmin && (
                   <Text style={styles.configNota}>Solo los administradores pueden gestionar roles.</Text>
@@ -1407,6 +1470,7 @@ const styles = StyleSheet.create({
   tabBtn: { paddingHorizontal: 12, paddingVertical: 10, alignItems: 'center' },
   tabText: { fontSize: 14, color: 'rgba(255,255,255,0.5)', fontWeight: '500' },
   tabTextActivo: { color: '#FFFFFF', fontWeight: '700' },
+  tabTextDesactivado: { color: 'rgba(255,255,255,0.24)' },
   tabUnderline: { height: 2, width: '100%', backgroundColor: '#4A9EFF', marginTop: 4, borderRadius: 2 },
   body: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
   card: {
@@ -1617,6 +1681,22 @@ const styles = StyleSheet.create({
   monedasDisponiblesContainer: { marginTop: 8, gap: 8 },
   monedaDisponibleChip: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   monedaDisponibleText: { fontSize: 14, color: 'rgba(255,255,255,0.8)' },
+  configSwitchRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12,
+    padding: 14, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  configSwitchTextWrap: { flex: 1 },
+  configSwitchTitulo: { fontSize: 14, color: '#FFFFFF', fontWeight: '700', marginBottom: 3 },
+  configSwitchDesc: { fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 17 },
+  configSwitch: {
+    width: 50, height: 28, borderRadius: 14, padding: 3,
+    backgroundColor: 'rgba(255,255,255,0.16)', justifyContent: 'center',
+  },
+  configSwitchActivo: { backgroundColor: '#4A9EFF' },
+  configSwitchDisabled: { opacity: 0.55 },
+  configSwitchThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFFFFF' },
+  configSwitchThumbActivo: { alignSelf: 'flex-end' },
   configMiembroRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 12, marginBottom: 8, gap: 10 },
   configMiembroNombre: { flex: 1, fontSize: 14, color: '#FFFFFF', fontWeight: '500' },
   configAdminBtn: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(74,158,255,0.4)' },

@@ -37,6 +37,7 @@ export type Grupo = {
   creador_id: string;
   miembros: GrupoMiembro[];
   presupuesto: number | null;
+  rankingActivo: boolean;
 };
 
 export const categoriaEmoji: Record<string, string> = {
@@ -58,6 +59,7 @@ type GruposStore = {
   quitarAdmin: (grupoId: string, userId: string) => Promise<void>;
   eliminarMiembro: (grupoId: string, userId: string) => Promise<boolean>;
   guardarPresupuesto: (id: string, monto: number) => Promise<void>;
+  actualizarRanking: (id: string, activo: boolean) => Promise<void>;
 };
 
 export const useGruposStore = create<GruposStore>((set, get) => ({
@@ -79,7 +81,7 @@ export const useGruposStore = create<GruposStore>((set, get) => ({
     const [{ data: grupos }, { data: gastosData }, { data: pagosData }] = await Promise.all([
       supabase
         .from('grupos')
-        .select('id, nombre, categoria, activo, monedas, creador_id, presupuesto, grupo_miembros(id, user_id, nombre, es_admin)')
+        .select('id, nombre, categoria, activo, monedas, creador_id, presupuesto, ranking_activo, grupo_miembros(id, user_id, nombre, es_admin)')
         .in('id', grupoIds),
       supabase
         .from('gastos')
@@ -189,6 +191,7 @@ export const useGruposStore = create<GruposStore>((set, get) => ({
         administradores: miembros.filter((m: any) => m.es_admin).map((m: any) => m.nombre),
         creador_id: g.creador_id ?? '',
         presupuesto: g.presupuesto ?? null,
+        rankingActivo: g.ranking_activo ?? true,
         miembros: miembros.map((m: any, idx: number) => ({
           user_id: m.user_id,
           nombre: m.nombre,
@@ -278,5 +281,10 @@ export const useGruposStore = create<GruposStore>((set, get) => ({
   guardarPresupuesto: async (id, monto) => {
     await supabase.from('grupos').update({ presupuesto: monto }).eq('id', id);
     set(state => ({ grupos: state.grupos.map(g => g.id === id ? { ...g, presupuesto: monto } : g) }));
+  },
+
+  actualizarRanking: async (id, activo) => {
+    await supabase.from('grupos').update({ ranking_activo: activo }).eq('id', id);
+    set(state => ({ grupos: state.grupos.map(g => g.id === id ? { ...g, rankingActivo: activo } : g) }));
   },
 }));

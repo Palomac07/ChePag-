@@ -21,6 +21,19 @@ entrypoint = "./functions/mp-create-preference/index.ts"
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/mp-create-preference/*.html" ]
 
+[functions.mp-verificar-pago]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/mp-verificar-pago/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/mp-verificar-pago/*.html" ]
+
+[functions.mp-return]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/mp-return/index.ts"
+
 [functions.mp-callback]
 enabled = true
 verify_jwt = false

@@ -1,5 +1,4 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,36 +11,29 @@ serve(async (req) => {
   }
 
   try {
-    const { preference_id, acreedor_id } = await req.json();
+    const { preference_id, external_reference } = await req.json();
+    const sellerAccessToken = Deno.env.get('MP_SELLER_ACCESS_TOKEN');
 
-    if (!preference_id || !acreedor_id) {
+    if (!preference_id && !external_reference) {
       return new Response(
-        JSON.stringify({ error: 'Faltan parámetros' }),
+        JSON.stringify({ error: 'Faltan parametros' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
-
-    const { data: perfil } = await supabase
-      .from('profiles')
-      .select('mp_access_token')
-      .eq('id', acreedor_id)
-      .single();
-
-    if (!perfil?.mp_access_token) {
+    if (!sellerAccessToken) {
       return new Response(
-        JSON.stringify({ aprobado: false, error: 'Sin token del acreedor' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ aprobado: false, error: 'Falta configurar MP_SELLER_ACCESS_TOKEN en Supabase' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    const query = external_reference
+      ? `external_reference=${encodeURIComponent(external_reference)}`
+      : `preference_id=${encodeURIComponent(preference_id)}`;
     const mpRes = await fetch(
-      `https://api.mercadopago.com/v1/payments/search?preference_id=${preference_id}`,
-      { headers: { 'Authorization': `Bearer ${perfil.mp_access_token}` } }
+      `https://api.mercadopago.com/v1/payments/search?${query}&sort=date_created&criteria=desc&limit=10`,
+      { headers: { 'Authorization': `Bearer ${sellerAccessToken}` } }
     );
 
     const mpData = await mpRes.json();
@@ -49,7 +41,11 @@ serve(async (req) => {
       mpData.results.some((p: any) => p.status === 'approved');
 
     return new Response(
-      JSON.stringify({ aprobado }),
+      JSON.stringify({
+        aprobado,
+        cantidad: Array.isArray(mpData.results) ? mpData.results.length : 0,
+        status: Array.isArray(mpData.results) && mpData.results[0] ? mpData.results[0].status : null,
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (e) {

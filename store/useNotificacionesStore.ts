@@ -62,11 +62,16 @@ export const useNotificacionesStore = create<NotificacionesStore>((set) => ({
   },
 
   confirmarPago: async (notifId: string, data: any) => {
+    const monto = Number(data.monto);
+    if (!monto || monto <= 0) {
+      throw new Error('Monto de pago invalido');
+    }
+
     await supabase.from('pagos').insert({
       grupo_id: data.grupo_id,
       de_nombre: data.de_nombre,
       a_nombre: data.a_nombre,
-      monto: data.monto,
+      monto,
     });
     if (data.debtor_user_id) {
       await supabase.from('notificaciones').insert({

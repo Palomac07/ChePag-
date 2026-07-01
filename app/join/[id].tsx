@@ -111,7 +111,7 @@ export default function JoinScreen() {
         <View style={styles.card}>
           <Text style={styles.emoji}>✅</Text>
           <Text style={styles.titulo}>Ya sos miembro</Text>
-          <Text style={styles.desc}>Ya sos parte del grupo "{grupo?.nombre}".</Text>
+          <Text style={styles.desc}>Ya sos parte del grupo &quot;{grupo?.nombre}&quot;.</Text>
           <TouchableOpacity style={styles.btn} onPress={() => router.replace({ pathname: '/detalle-grupo', params: { nombre: grupo?.nombre, id } })}>
             <Text style={styles.btnText}>Ver grupo</Text>
           </TouchableOpacity>

@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, ImageBackground } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import PagerView from '@/components/PagerViewCompat';
@@ -12,28 +12,29 @@ import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TourProvider, useTour, useTourTarget } from '@/components/tour/TourProvider';
 
-const TOUR_SEEN_KEY = 'chepaga_tour_seen';
-
 import HomeScreen from './index';
 import GruposScreen from './grupos';
 import NotificacionesScreen from './notificaciones';
 import PerfilScreen from './perfil';
 
+const TOUR_SEEN_KEY = 'chepaga_tour_seen';
+const RECORDATORIO_DEUDA_MS = 24 * 60 * 60 * 1000;
+
 const PAGES = [
-  { key: 'home',           component: HomeScreen },
-  { key: 'grupos',         component: GruposScreen },
+  { key: 'home', component: HomeScreen },
+  { key: 'grupos', component: GruposScreen },
   { key: 'notificaciones', component: NotificacionesScreen },
-  { key: 'perfil',         component: PerfilScreen },
+  { key: 'perfil', component: PerfilScreen },
 ];
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const TABS: { key: string; icon: IoniconName; iconActive: IoniconName; pageIdx: number }[] = [
-  { key: 'home',           icon: 'home-outline',          iconActive: 'home',          pageIdx: 0 },
-  { key: 'grupos',         icon: 'people-outline',        iconActive: 'people',        pageIdx: 1 },
-  { key: 'agregar',        icon: 'add',                   iconActive: 'add',           pageIdx: -1 },
+  { key: 'home', icon: 'home-outline', iconActive: 'home', pageIdx: 0 },
+  { key: 'grupos', icon: 'people-outline', iconActive: 'people', pageIdx: 1 },
+  { key: 'agregar', icon: 'add', iconActive: 'add', pageIdx: -1 },
   { key: 'notificaciones', icon: 'notifications-outline', iconActive: 'notifications', pageIdx: 2 },
-  { key: 'perfil',         icon: 'person-outline',        iconActive: 'person',        pageIdx: 3 },
+  { key: 'perfil', icon: 'person-outline', iconActive: 'person', pageIdx: 3 },
 ];
 
 export default function TabLayout() {
@@ -60,12 +61,15 @@ function TabsContent() {
     perfil: useTourTarget('tab-perfil'),
   } as Record<string, (node: any) => void>;
 
-  // Tour de bienvenida en el primer ingreso.
   useEffect(() => {
     AsyncStorage.getItem(TOUR_SEEN_KEY).then(visto => {
-      if (!visto) { startTour(); AsyncStorage.setItem(TOUR_SEEN_KEY, '1'); }
+      if (!visto) {
+        startTour();
+        AsyncStorage.setItem(TOUR_SEEN_KEY, '1');
+      }
     });
   }, [startTour]);
+
   const cantidadSolicitudes = useAmistadStore(s => s.solicitudesPendientes.length);
   const cantidadNotifs = useNotificacionesStore(s => s.notificaciones.filter(n => !n.leida).length);
   const totalBadge = cantidadSolicitudes + cantidadNotifs;
@@ -74,23 +78,31 @@ function TabsContent() {
 
   useEffect(() => {
     if (!userId || grupos.length === 0) return;
-    const hoy = new Date().toISOString().slice(0, 10);
-    AsyncStorage.getItem('ultimo_recordatorio').then(async (ultimo) => {
-      if (ultimo === hoy) return;
-      const gruposConDeuda = grupos.filter(g => g.activo && g.debesNum > 0);
-      if (gruposConDeuda.length === 0) {
-        await AsyncStorage.setItem('ultimo_recordatorio', hoy);
-        return;
-      }
-      const recordatorios = gruposConDeuda.map(g => ({
+
+    const ahora = Date.now();
+    const gruposConDeuda = grupos.filter(g => g.activo && g.debesNum > 0);
+    if (gruposConDeuda.length === 0) return;
+
+    Promise.all(gruposConDeuda.map(async (g) => {
+      const key = `ultimo_recordatorio_deuda:${userId}:${g.id}`;
+      const ultimo = await AsyncStorage.getItem(key);
+      const ultimoMs = ultimo ? Number(ultimo) : 0;
+
+      if (ultimoMs && ahora - ultimoMs < RECORDATORIO_DEUDA_MS) return null;
+
+      await AsyncStorage.setItem(key, String(ahora));
+      return {
         user_id: userId,
         tipo: 'recordatorio_deuda',
-        titulo: '⏰ Deuda pendiente',
-        mensaje: `Debés $${g.debesNum.toLocaleString('es-AR')} en ${g.nombre}. No te olvides de saldarlo.`,
-        data: { grupo_id: g.id, grupo_nombre: g.nombre },
-      }));
-      await supabase.from('notificaciones').insert(recordatorios);
-      await AsyncStorage.setItem('ultimo_recordatorio', hoy);
+        titulo: 'Deuda pendiente',
+        mensaje: `Todavia debes $${g.debesNum.toLocaleString('es-AR')} en ${g.nombre}. No te olvides de saldarlo.`,
+        data: { grupo_id: g.id, grupo_nombre: g.nombre, monto: g.debesNum },
+      };
+    })).then(async (recordatorios) => {
+      const nuevos = recordatorios.filter((r): r is NonNullable<typeof r> => r !== null);
+      if (nuevos.length > 0) {
+        await supabase.from('notificaciones').insert(nuevos);
+      }
     });
   }, [userId, grupos]);
 
@@ -114,7 +126,6 @@ function TabsContent() {
         ))}
       </PagerView>
 
-      {/* Floating tab bar */}
       <View style={[styles.tabBarWrap, { bottom: 20 + insets.bottom }]}>
         <View style={styles.tabBarInner}>
           {TABS.map(tab => {
@@ -126,7 +137,10 @@ function TabsContent() {
                 style={styles.tabItem}
                 activeOpacity={0.7}
                 onPress={() => {
-                  if (isAdd) { setAccionesVisible(true); return; }
+                  if (isAdd) {
+                    setAccionesVisible(true);
+                    return;
+                  }
                   goTo(tab.pageIdx);
                 }}
               >
@@ -154,18 +168,17 @@ function TabsContent() {
         </View>
       </View>
 
-      {/* Acciones modal */}
       <Modal transparent animationType="fade" visible={accionesVisible} onRequestClose={() => setAccionesVisible(false)}>
         <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setAccionesVisible(false)}>
           <View style={styles.sheet}>
-            <Text style={styles.sheetTitulo}>¿Qué querés hacer?</Text>
+            <Text style={styles.sheetTitulo}>Que queres hacer?</Text>
             <TouchableOpacity style={styles.accionItem} onPress={() => { setAccionesVisible(false); router.push('/crear-grupo'); }}>
               <View style={styles.accionIconWrap}>
                 <Ionicons name="people-outline" size={22} color="#FFFFFF" />
               </View>
               <View>
                 <Text style={styles.accionLabel}>Nuevo grupo</Text>
-                <Text style={styles.accionDesc}>Creá un grupo para dividir gastos</Text>
+                <Text style={styles.accionDesc}>Crea un grupo para dividir gastos</Text>
               </View>
             </TouchableOpacity>
             <View style={styles.accionSep} />
@@ -175,7 +188,7 @@ function TabsContent() {
               </View>
               <View>
                 <Text style={styles.accionLabel}>Nuevo gasto</Text>
-                <Text style={styles.accionDesc}>Registrá un gasto en un grupo</Text>
+                <Text style={styles.accionDesc}>Registra un gasto en un grupo</Text>
               </View>
             </TouchableOpacity>
             <View style={styles.accionSep} />
@@ -185,7 +198,7 @@ function TabsContent() {
               </View>
               <View>
                 <Text style={styles.accionLabel}>Nuevo amigo</Text>
-                <Text style={styles.accionDesc}>Buscá y agregá amigos a ChePaga</Text>
+                <Text style={styles.accionDesc}>Busca y agrega amigos a ChePaga</Text>
               </View>
             </TouchableOpacity>
           </View>
