@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Keyboard, TouchableWithoutFeedback, ImageBackground, Modal } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -92,17 +92,41 @@ export default function AgregarGastoScreen() {
   const [fotoPathExistente, setFotoPathExistente] = useState<string | null>(null);
   const [fotoExistenteUrl, setFotoExistenteUrl] = useState<string | null>(null);
   const [fotoSourceModal, setFotoSourceModal] = useState(false);
+  const [fotoPendiente, setFotoPendiente] = useState<'camara' | 'galeria' | null>(null);
+  const [pickerActivo, setPickerActivo] = useState(false);
+  const pickerActivoRef = useRef(false);
   const [permisoDenegado, setPermisoDenegado] = useState(false);
 
-  const elegirFoto = async (origen: 'camara' | 'galeria') => {
+  const pedirFoto = (origen: 'camara' | 'galeria') => {
+    if (pickerActivoRef.current) return;
+    setFotoPendiente(origen);
     setFotoSourceModal(false);
-    // Esperar a que se cierre el modal antes de abrir cámara/galería; si se lanza
-    // mientras el modal se está cerrando, algunos dispositivos descartan el picker.
-    await new Promise(r => setTimeout(r, 500));
-    const resultado = origen === 'camara' ? await pickFromCamera() : await pickFromGallery();
-    if (resultado === 'denied') { setPermisoDenegado(true); return; }
-    if (resultado) setFoto(resultado);
   };
+
+  useEffect(() => {
+    if (!fotoPendiente || fotoSourceModal || pickerActivoRef.current) return;
+    let cancelado = false;
+    const abrirPicker = async () => {
+      pickerActivoRef.current = true;
+      setPickerActivo(true);
+      try {
+        // Esperar a que se cierre el modal antes de abrir cámara/galería; si se lanza
+        // mientras el modal se está cerrando, algunos dispositivos descartan el picker.
+        await new Promise(r => setTimeout(r, 650));
+        const resultado = fotoPendiente === 'camara' ? await pickFromCamera() : await pickFromGallery();
+        if (!cancelado) {
+          if (resultado === 'denied') setPermisoDenegado(true);
+          else if (resultado) setFoto(resultado);
+          setFotoPendiente(null);
+        }
+      } finally {
+        pickerActivoRef.current = false;
+        if (!cancelado) setPickerActivo(false);
+      }
+    };
+    abrirPicker();
+    return () => { cancelado = true; };
+  }, [fotoPendiente, fotoSourceModal]);
 
   const grupoActual = grupos.find(g => g.nombre === grupoSeleccionado);
   const monedasGrupo = grupoActual?.monedas ?? [];
@@ -383,12 +407,12 @@ export default function AgregarGastoScreen() {
           <TouchableOpacity style={styles.fotoOverlay} activeOpacity={1} onPress={() => setFotoSourceModal(false)}>
             <View style={styles.fotoSheet}>
               <Text style={styles.fotoSheetTitulo}>Adjuntar comprobante</Text>
-              <TouchableOpacity style={styles.fotoOpcion} onPress={() => elegirFoto('camara')}>
+              <TouchableOpacity style={styles.fotoOpcion} onPress={() => pedirFoto('camara')} disabled={pickerActivo}>
                 <View style={styles.fotoOpcionIcon}><Ionicons name="camera-outline" size={22} color="#FFFFFF" /></View>
                 <Text style={styles.fotoOpcionText}>Tomar foto</Text>
               </TouchableOpacity>
               <View style={styles.fotoSep} />
-              <TouchableOpacity style={styles.fotoOpcion} onPress={() => elegirFoto('galeria')}>
+              <TouchableOpacity style={styles.fotoOpcion} onPress={() => pedirFoto('galeria')} disabled={pickerActivo}>
                 <View style={styles.fotoOpcionIcon}><Ionicons name="image-outline" size={22} color="#FFFFFF" /></View>
                 <Text style={styles.fotoOpcionText}>Elegir de galería</Text>
               </TouchableOpacity>
