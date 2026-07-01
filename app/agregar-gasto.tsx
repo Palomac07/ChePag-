@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Keyboard, TouchableWithoutFeedback, ImageBackground, Modal, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Keyboard, TouchableWithoutFeedback, ImageBackground, Modal } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -96,10 +96,9 @@ export default function AgregarGastoScreen() {
 
   const elegirFoto = async (origen: 'camara' | 'galeria') => {
     setFotoSourceModal(false);
-    // iOS: esperar a que se cierre el modal antes de abrir la cámara/galería; si se
-    // lanza mientras el modal se está cerrando, iOS descarta la presentación y no
-    // se abre nada (al tocar "no aparece ningún mensaje").
-    if (Platform.OS === 'ios') await new Promise(r => setTimeout(r, 500));
+    // Esperar a que se cierre el modal antes de abrir cámara/galería; si se lanza
+    // mientras el modal se está cerrando, algunos dispositivos descartan el picker.
+    await new Promise(r => setTimeout(r, 500));
     const resultado = origen === 'camara' ? await pickFromCamera() : await pickFromGallery();
     if (resultado === 'denied') { setPermisoDenegado(true); return; }
     if (resultado) setFoto(resultado);
