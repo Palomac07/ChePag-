@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
+import { getSignedUrl } from '@/lib/ticketImage';
 
 export type GrupoMiembro = {
   user_id: string;
@@ -14,6 +15,7 @@ export type Moneda = {
   simbolo: string;
   tasaARS: number;
   tasaAuto?: boolean;
+  fotoPath?: string;
 };
 
 export type Grupo = {
@@ -38,6 +40,8 @@ export type Grupo = {
   miembros: GrupoMiembro[];
   presupuesto: number | null;
   rankingActivo: boolean;
+  fotoPath: string | null;
+  fotoUrl: string | null;
 };
 
 export const categoriaEmoji: Record<string, string> = {
@@ -107,7 +111,7 @@ export const useGruposStore = create<GruposStore>((set, get) => ({
       pagosPorGrupo[p.grupo_id].push(p);
     }
 
-    const mapeados: Grupo[] = grupos.map((g: any) => {
+    const mapeados: Grupo[] = await Promise.all(grupos.map(async (g: any) => {
       const miembros: any[] = g.grupo_miembros || [];
       const avatares = miembros.slice(0, 3).map((m: any) => m.nombre[0].toUpperCase());
       const extras = Math.max(0, miembros.length - 3);
@@ -115,6 +119,7 @@ export const useGruposStore = create<GruposStore>((set, get) => ({
       const monedas: Moneda[] = Array.isArray(g.monedas)
         ? g.monedas
         : [{ codigo: 'ARS', nombre: 'Peso argentino', simbolo: '$', tasaARS: 1 }];
+      const fotoPath = monedas.find(m => m.fotoPath)?.fotoPath ?? null;
       const monedasMap: Record<string, number> = {};
       for (const m of monedas) monedasMap[m.codigo] = m.tasaARS;
 
@@ -192,6 +197,8 @@ export const useGruposStore = create<GruposStore>((set, get) => ({
         creador_id: g.creador_id ?? '',
         presupuesto: g.presupuesto ?? null,
         rankingActivo: g.ranking_activo ?? true,
+        fotoPath,
+        fotoUrl: fotoPath ? await getSignedUrl(fotoPath) : null,
         miembros: miembros.map((m: any, idx: number) => ({
           user_id: m.user_id,
           nombre: m.nombre,
@@ -199,7 +206,7 @@ export const useGruposStore = create<GruposStore>((set, get) => ({
           color: COLORES[idx % COLORES.length],
         })),
       };
-    });
+    }));
 
     set({ grupos: mapeados });
   },

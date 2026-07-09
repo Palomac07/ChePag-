@@ -8,6 +8,8 @@ import { shareViaWhatsApp, shareInvite, copyInviteLink } from '@/lib/invite';
 import { useUserStore } from '@/store/useUserStore';
 import { useGruposStore } from '@/store/useGruposStore';
 import { useAmistadStore } from '@/store/useAmistadStore';
+import { readAsStringAsync } from 'expo-file-system/legacy';
+import { uploadTicket } from '@/lib/ticketImage';
 
 const BG = require('@/assets/images/bg.png');
 const COLORES = ['#9B8EC4', '#7BC4B8', '#6BAED6', '#5BAA9F', '#C084C0', '#4A6580', '#6BAA9F'];
@@ -22,8 +24,8 @@ const GLASS = {
 
 export default function AgregarParticipantesScreen() {
   const router = useRouter();
-  const { nombreGrupo, categoria, monedas, modo, grupoId: grupoIdParam } = useLocalSearchParams<{
-    nombreGrupo: string; categoria: string; monedas: string; modo: string; grupoId: string;
+  const { nombreGrupo, categoria, monedas, modo, grupoId: grupoIdParam, fotoGrupoUri } = useLocalSearchParams<{
+    nombreGrupo: string; categoria: string; monedas: string; modo: string; grupoId: string; fotoGrupoUri?: string;
   }>();
 
   const userId = useUserStore(s => s.id);
@@ -60,6 +62,18 @@ export default function AgregarParticipantesScreen() {
       });
       const { error: insertErr } = await supabase.from('grupos').insert({ id: nuevoId, nombre: nombreGrupo, categoria, monedas: monedaParseada, creador_id: userId });
       if (insertErr) { setError('No se pudo crear el grupo. Volvé e intentá de nuevo.'); setCreandoGrupo(false); return; }
+      if (fotoGrupoUri) {
+        try {
+          const base64 = await readAsStringAsync(fotoGrupoUri, { encoding: 'base64' });
+          const fotoPath = await uploadTicket(userId, nuevoId, base64);
+          if (fotoPath) {
+            const monedasConFoto = monedaParseada.map((m: any, idx: number) => idx === 0 ? { ...m, fotoPath } : m);
+            await supabase.from('grupos').update({ monedas: monedasConFoto }).eq('id', nuevoId);
+          }
+        } catch {
+          // Si la foto falla, el grupo se crea igual para no bloquear el flujo principal.
+        }
+      }
       await supabase.from('grupo_miembros').insert({ grupo_id: nuevoId, user_id: userId, nombre: nombreUsuario, es_admin: true });
       setGrupoId(nuevoId);
       setCreandoGrupo(false);

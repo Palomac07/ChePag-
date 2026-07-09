@@ -1,10 +1,12 @@
-import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Keyboard, ImageBackground } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Keyboard, ImageBackground, Modal } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Moneda } from '@/store/useGruposStore';
 import ConfirmPopup from '@/components/ConfirmPopup';
 import { fetchRatesMap } from '@/lib/ratesCache';
+import { ImagenElegida, pickFromCamera, pickFromGallery } from '@/lib/ticketImage';
 
 const BG = require('@/assets/images/bg.png');
 const categorias = ['Viaje', 'Evento', 'Otro'];
@@ -29,9 +31,14 @@ export default function CrearGrupoScreen() {
   const [tasasInput, setTasasInput] = useState<Record<string, string>>({ ARS: '1' });
   const [tasasModo, setTasasModo] = useState<Record<string, 'auto' | 'manual'>>({});
   const [errorMonedas, setErrorMonedas] = useState('');
-  const [popupProx, setPopupProx] = useState(false);
   const [tipoOtro, setTipoOtro] = useState('');
   const [errorOtro, setErrorOtro] = useState('');
+  const [foto, setFoto] = useState<ImagenElegida | null>(null);
+  const [fotoSourceModal, setFotoSourceModal] = useState(false);
+  const [fotoPendiente, setFotoPendiente] = useState<'camara' | 'galeria' | null>(null);
+  const [pickerActivo, setPickerActivo] = useState(false);
+  const pickerActivoRef = useRef(false);
+  const [permisoDenegado, setPermisoDenegado] = useState(false);
 
   const fetchTasaParaCodigo = (codigo: string) => {
     fetchRatesMap().then(mapa => {
@@ -45,6 +52,35 @@ export default function CrearGrupoScreen() {
     if (categoria === 'Otro' && !tipoOtro.trim()) { setErrorOtro('Especificá el tipo de grupo.'); return; }
     setError(''); setErrorOtro(''); setPaso(2);
   };
+
+  const pedirFoto = (origen: 'camara' | 'galeria') => {
+    if (pickerActivoRef.current) return;
+    setFotoPendiente(origen);
+    setFotoSourceModal(false);
+  };
+
+  useEffect(() => {
+    if (!fotoPendiente || fotoSourceModal || pickerActivoRef.current) return;
+    let cancelado = false;
+    const abrirPicker = async () => {
+      pickerActivoRef.current = true;
+      setPickerActivo(true);
+      try {
+        await new Promise(r => setTimeout(r, 650));
+        const resultado = fotoPendiente === 'camara' ? await pickFromCamera() : await pickFromGallery();
+        if (!cancelado) {
+          if (resultado === 'denied') setPermisoDenegado(true);
+          else if (resultado) setFoto(resultado);
+          setFotoPendiente(null);
+        }
+      } finally {
+        pickerActivoRef.current = false;
+        if (!cancelado) setPickerActivo(false);
+      }
+    };
+    abrirPicker();
+    return () => { cancelado = true; };
+  }, [fotoPendiente, fotoSourceModal]);
 
   const toggleMoneda = (codigo: string) => {
     if (codigo === 'ARS') return;
@@ -71,7 +107,7 @@ export default function CrearGrupoScreen() {
       const moneda = MONEDAS_DISPONIBLES.find(m => m.codigo === codigo)!;
       return { ...moneda, tasaARS: Number(tasasInput[codigo]), tasaAuto: codigo !== 'ARS' ? tasasModo[codigo] !== 'manual' : undefined };
     });
-    router.push({ pathname: '/agregar-participantes', params: { nombreGrupo: nombre.trim(), categoria: categoria === 'Otro' ? tipoOtro.trim() : categoria, monedas: JSON.stringify(monedasConTasas) } });
+    router.push({ pathname: '/agregar-participantes', params: { nombreGrupo: nombre.trim(), categoria: categoria === 'Otro' ? tipoOtro.trim() : categoria, monedas: JSON.stringify(monedasConTasas), fotoGrupoUri: foto?.uri ?? '' } });
   };
 
   return (
@@ -107,10 +143,27 @@ export default function CrearGrupoScreen() {
             />
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-            <TouchableOpacity style={styles.fotoBox} onPress={() => setPopupProx(true)}>
-              <Ionicons name="camera-outline" size={28} color="rgba(255,255,255,0.3)" />
-              <Text style={styles.fotoText}>Agregar Foto</Text>
-            </TouchableOpacity>
+            {foto ? (
+              <View style={styles.fotoPreviewWrap}>
+                <Image source={{ uri: foto.uri }} style={styles.fotoPreview} contentFit="cover" />
+                <View style={styles.fotoPreviewInfo}>
+                  <Text style={styles.fotoPreviewTitle}>Foto del grupo</Text>
+                  <View style={styles.fotoActions}>
+                    <TouchableOpacity onPress={() => setFotoSourceModal(true)}>
+                      <Text style={styles.fotoActionText}>Cambiar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setFoto(null)}>
+                      <Text style={[styles.fotoActionText, { color: '#FF4D4D' }]}>Quitar</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.fotoBox} onPress={() => setFotoSourceModal(true)}>
+                <Ionicons name="camera-outline" size={28} color="rgba(255,255,255,0.3)" />
+                <Text style={styles.fotoText}>Agregar Foto</Text>
+              </TouchableOpacity>
+            )}
 
             <Text style={styles.label}>Tipo de grupo</Text>
             <View style={styles.categoriasRow}>
@@ -237,7 +290,24 @@ export default function CrearGrupoScreen() {
         </ScrollView>
       )}
 
-      <ConfirmPopup visible={popupProx} emoji="🚀" titulo="¡Próximamente!" mensaje="Esta función estará disponible en la próxima versión de ChePaga." onClose={() => setPopupProx(false)} />
+      <ConfirmPopup visible={permisoDenegado} emoji="🔒" titulo="Permiso necesario" mensaje="Para agregar una foto al grupo, habilitá el acceso a la cámara o las fotos desde la configuración de tu teléfono." onClose={() => setPermisoDenegado(false)} />
+
+      <Modal transparent animationType="fade" visible={fotoSourceModal} onRequestClose={() => setFotoSourceModal(false)}>
+        <TouchableOpacity style={styles.fotoOverlay} activeOpacity={1} onPress={() => setFotoSourceModal(false)}>
+          <View style={styles.fotoSheet}>
+            <Text style={styles.fotoSheetTitulo}>Foto del grupo</Text>
+            <TouchableOpacity style={styles.fotoOpcion} onPress={() => pedirFoto('camara')} disabled={pickerActivo}>
+              <View style={styles.fotoOpcionIcon}><Ionicons name="camera-outline" size={22} color="#FFFFFF" /></View>
+              <Text style={styles.fotoOpcionText}>Tomar foto</Text>
+            </TouchableOpacity>
+            <View style={styles.fotoSep} />
+            <TouchableOpacity style={styles.fotoOpcion} onPress={() => pedirFoto('galeria')} disabled={pickerActivo}>
+              <View style={styles.fotoOpcionIcon}><Ionicons name="image-outline" size={22} color="#FFFFFF" /></View>
+              <Text style={styles.fotoOpcionText}>Elegir de galería</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </ImageBackground>
   );
 }
@@ -274,6 +344,23 @@ const styles = StyleSheet.create({
     height: 100, backgroundColor: 'rgba(255,255,255,0.04)', marginVertical: 16,
   },
   fotoText: { color: 'rgba(255,255,255,0.4)', fontSize: 14 },
+  fotoPreviewWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    borderRadius: 16, borderWidth: 1, borderColor: 'rgba(74,158,255,0.28)',
+    backgroundColor: 'rgba(74,158,255,0.1)', padding: 10, marginVertical: 16,
+  },
+  fotoPreview: { width: 78, height: 78, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.08)' },
+  fotoPreviewInfo: { flex: 1 },
+  fotoPreviewTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  fotoActions: { flexDirection: 'row', gap: 18, marginTop: 8 },
+  fotoActionText: { color: '#4A9EFF', fontSize: 14, fontWeight: '700' },
+  fotoOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+  fotoSheet: { backgroundColor: 'rgba(8,18,40,0.97)', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingTop: 24, paddingBottom: 48, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  fotoSheetTitulo: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.38)', marginBottom: 12, textAlign: 'center', letterSpacing: 0.5 },
+  fotoOpcion: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, gap: 16 },
+  fotoOpcionIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(74,158,255,0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(74,158,255,0.25)' },
+  fotoOpcionText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  fotoSep: { height: 1, backgroundColor: 'rgba(255,255,255,0.07)' },
   categoriasRow: { flexDirection: 'row', gap: 10, marginTop: 8, marginBottom: 4 },
   categoriaChip: {
     paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20,

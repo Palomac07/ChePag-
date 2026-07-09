@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Animated, ImageBackground } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useGruposStore } from '@/store/useGruposStore';
 
 const BG = require('@/assets/images/bg.png');
@@ -43,6 +44,7 @@ export default function MisGruposScreen() {
           >
             <View style={[styles.card, !grupo.activo && styles.cardPausado]}>
               <View style={styles.cardHeader}>
+                {grupo.fotoUrl ? <Image source={{ uri: grupo.fotoUrl }} style={styles.cardPhoto} contentFit="cover" /> : null}
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.grupoNombre, !grupo.activo && styles.textMuted]}>
                     {grupo.nombre}
@@ -132,6 +134,11 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'flex-start', marginBottom: 18,
+  },
+  cardPhoto: {
+    width: 58, height: 58, borderRadius: 16, marginRight: 14,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
   grupoNombre: { fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
   grupoParticipantes: { fontSize: 13, color: 'rgba(255,255,255,0.42)', marginTop: 3 },

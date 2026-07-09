@@ -5,6 +5,7 @@ import {
 import PagerView from '@/components/PagerViewCompat';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import ConfirmPopup from '@/components/ConfirmPopup';
 import { useGruposStore, Moneda } from '@/store/useGruposStore';
 import { useUserStore } from '@/store/useUserStore';
@@ -648,7 +649,14 @@ export default function DetalleGrupoScreen() {
           <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/grupos')} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={22} color="rgba(255,255,255,0.8)" />
           </TouchableOpacity>
-          <Text style={styles.title} numberOfLines={1}>{emoji}  {nombre ?? 'Grupo'}</Text>
+          <View style={styles.titleWrap}>
+            {grupo?.fotoUrl ? (
+              <Image source={{ uri: grupo.fotoUrl }} style={styles.headerPhoto} contentFit="cover" />
+            ) : (
+              <Text style={styles.titleEmoji}>{emoji}</Text>
+            )}
+            <Text style={styles.title} numberOfLines={1}>{nombre ?? 'Grupo'}</Text>
+          </View>
           <TouchableOpacity onPress={() => setMenuVisible(!menuVisible)} style={styles.menuBtn}>
             <Text style={styles.menuIcon}>⋯</Text>
           </TouchableOpacity>
@@ -1512,6 +1520,9 @@ const styles = StyleSheet.create({
   backEdgeZone: { position: 'absolute', left: 0, top: 130, bottom: 0, width: 40, zIndex: 50 },
   header: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 16, flexDirection: 'row', alignItems: 'center' },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
+  titleWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 },
+  headerPhoto: { width: 36, height: 36, borderRadius: 12, marginRight: 10, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
+  titleEmoji: { fontSize: 20, marginRight: 8 },
   title: { flex: 1, fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
   tabsContainer: { paddingBottom: 0, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
   tabs: { paddingHorizontal: 16, gap: 4 },
