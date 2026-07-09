@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Keyboard, TouchableWithoutFeedback, ImageBackground, Modal } from 'react-native';
+import { useCallback, useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Keyboard, TouchableWithoutFeedback, ImageBackground } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,9 @@ import { useGruposStore } from '@/store/useGruposStore';
 import { useUserStore } from '@/store/useUserStore';
 import { supabase } from '@/lib/supabase';
 import { needsRatesFetch, fetchRatesMap } from '@/lib/ratesCache';
-import { pickFromCamera, pickFromGallery, uploadTicket, getSignedUrl, deleteTicket, type ImagenElegida } from '@/lib/ticketImage';
+import { uploadTicket, getSignedUrl, deleteTicket, type ImagenElegida } from '@/lib/ticketImage';
+import ImageSourceModal from '@/components/ImageSourceModal';
+import { useImagePicker } from '@/hooks/useImagePicker';
 
 const BG = require('@/assets/images/bg.png');
 
@@ -91,42 +93,15 @@ export default function AgregarGastoScreen() {
   const [foto, setFoto] = useState<ImagenElegida | null>(null);
   const [fotoPathExistente, setFotoPathExistente] = useState<string | null>(null);
   const [fotoExistenteUrl, setFotoExistenteUrl] = useState<string | null>(null);
-  const [fotoSourceModal, setFotoSourceModal] = useState(false);
-  const [fotoPendiente, setFotoPendiente] = useState<'camara' | 'galeria' | null>(null);
-  const [pickerActivo, setPickerActivo] = useState(false);
-  const pickerActivoRef = useRef(false);
-  const [permisoDenegado, setPermisoDenegado] = useState(false);
-
-  const pedirFoto = (origen: 'camara' | 'galeria') => {
-    if (pickerActivoRef.current) return;
-    setFotoPendiente(origen);
-    setFotoSourceModal(false);
-  };
-
-  useEffect(() => {
-    if (!fotoPendiente || fotoSourceModal || pickerActivoRef.current) return;
-    let cancelado = false;
-    const abrirPicker = async () => {
-      pickerActivoRef.current = true;
-      setPickerActivo(true);
-      try {
-        // Esperar a que se cierre el modal antes de abrir cámara/galería; si se lanza
-        // mientras el modal se está cerrando, algunos dispositivos descartan el picker.
-        await new Promise(r => setTimeout(r, 650));
-        const resultado = fotoPendiente === 'camara' ? await pickFromCamera() : await pickFromGallery();
-        if (!cancelado) {
-          if (resultado === 'denied') setPermisoDenegado(true);
-          else if (resultado) setFoto(resultado);
-          setFotoPendiente(null);
-        }
-      } finally {
-        pickerActivoRef.current = false;
-        if (!cancelado) setPickerActivo(false);
-      }
-    };
-    abrirPicker();
-    return () => { cancelado = true; };
-  }, [fotoPendiente, fotoSourceModal]);
+  const handleFotoElegida = useCallback((imagen: ImagenElegida) => setFoto(imagen), []);
+  const {
+    sourceModalVisible: fotoSourceModal,
+    setSourceModalVisible: setFotoSourceModal,
+    pedirImagen: pedirFoto,
+    pickerActivo,
+    permisoDenegado,
+    setPermisoDenegado,
+  } = useImagePicker(handleFotoElegida);
 
   const grupoActual = grupos.find(g => g.nombre === grupoSeleccionado);
   const monedasGrupo = grupoActual?.monedas ?? [];
@@ -402,23 +377,13 @@ export default function AgregarGastoScreen() {
 
         <ConfirmPopup visible={popupVisible} emoji="✅" titulo={esEdicion ? '¡Gasto actualizado!' : '¡Gasto agregado!'} mensaje={esEdicion ? 'Los cambios se guardaron y los balances del grupo se actualizaron.' : 'El gasto fue registrado y los balances del grupo se actualizaron.'} onClose={() => { setPopupVisible(false); router.back(); }} />
         <ConfirmPopup visible={permisoDenegado} emoji="🔒" titulo="Permiso necesario" mensaje="Para adjuntar el comprobante, habilitá el acceso a la cámara o las fotos desde la configuración de tu teléfono." onClose={() => setPermisoDenegado(false)} />
-
-        <Modal transparent animationType="fade" visible={fotoSourceModal} onRequestClose={() => setFotoSourceModal(false)}>
-          <TouchableOpacity style={styles.fotoOverlay} activeOpacity={1} onPress={() => setFotoSourceModal(false)}>
-            <View style={styles.fotoSheet}>
-              <Text style={styles.fotoSheetTitulo}>Adjuntar comprobante</Text>
-              <TouchableOpacity style={styles.fotoOpcion} onPress={() => pedirFoto('camara')} disabled={pickerActivo}>
-                <View style={styles.fotoOpcionIcon}><Ionicons name="camera-outline" size={22} color="#FFFFFF" /></View>
-                <Text style={styles.fotoOpcionText}>Tomar foto</Text>
-              </TouchableOpacity>
-              <View style={styles.fotoSep} />
-              <TouchableOpacity style={styles.fotoOpcion} onPress={() => pedirFoto('galeria')} disabled={pickerActivo}>
-                <View style={styles.fotoOpcionIcon}><Ionicons name="image-outline" size={22} color="#FFFFFF" /></View>
-                <Text style={styles.fotoOpcionText}>Elegir de galería</Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        </Modal>
+        <ImageSourceModal
+          visible={fotoSourceModal}
+          title="Adjuntar comprobante"
+          disabled={pickerActivo}
+          onClose={() => setFotoSourceModal(false)}
+          onPick={pedirFoto}
+        />
       </ImageBackground>
     </TouchableWithoutFeedback>
   );
@@ -470,13 +435,6 @@ const styles = StyleSheet.create({
   ticketPreviewInfo: { flex: 1 },
   ticketPreviewLabel: { fontSize: 14, fontWeight: '600', color: '#FFFFFF' },
   ticketPreviewAction: { fontSize: 13, color: '#4A9EFF', fontWeight: '700' },
-  fotoOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
-  fotoSheet: { backgroundColor: 'rgba(8,18,40,0.97)', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingTop: 24, paddingBottom: 48, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  fotoSheetTitulo: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.38)', marginBottom: 12, textAlign: 'center', letterSpacing: 0.5 },
-  fotoOpcion: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, gap: 16 },
-  fotoOpcionIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(74,158,255,0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(74,158,255,0.25)' },
-  fotoOpcionText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
-  fotoSep: { height: 1, backgroundColor: 'rgba(255,255,255,0.07)' },
   guardarBtn: { backgroundColor: '#4A9EFF', borderRadius: 50, paddingVertical: 16, alignItems: 'center' },
   guardarText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   errorText: { color: '#FF4D4D', fontSize: 12, marginTop: 4 },
