@@ -1,6 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, useWindowDimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import PagerView from '@/components/PagerViewCompat';
 import { useRouter } from 'expo-router';
@@ -47,14 +46,9 @@ export default function TabLayout() {
 
 function TabsContent() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const { width, height } = useWindowDimensions();
   const pagerRef = useRef<PagerView>(null);
   const [activeIdx, setActiveIdx] = useState(0);
   const [accionesVisible, setAccionesVisible] = useState(false);
-  const compactPhone = width < 380 || height < 720;
-  const tabHorizontalMargin = compactPhone ? 14 : 20;
-  const tabBottomOffset = Math.max(8, insets.bottom + (compactPhone ? 2 : 6));
 
   const { startTour } = useTour();
   const tourRefs = {
@@ -130,14 +124,7 @@ function TabsContent() {
         ))}
       </PagerView>
 
-      <View style={[
-        styles.tabBarWrap,
-        {
-          left: tabHorizontalMargin,
-          right: tabHorizontalMargin,
-          bottom: tabBottomOffset,
-        },
-      ]}>
+      <View style={styles.tabBarWrap}>
         <View style={styles.tabBarInner}>
           {TABS.map(tab => {
             const isActive = tab.pageIdx === activeIdx;
@@ -157,7 +144,7 @@ function TabsContent() {
               >
                 {isAdd ? (
                   <View ref={tourRefs[tab.key]} style={styles.plusBtn}>
-                    <Ionicons name="add" size={26} color="#FFFFFF" />
+                    <Ionicons name="add" size={24} color="#FFFFFF" />
                   </View>
                 ) : (
                   <View ref={tourRefs[tab.key]} style={styles.tabIconWrap}>
@@ -226,7 +213,11 @@ const styles = StyleSheet.create({
 
   tabBarWrap: {
     position: 'absolute',
-    borderRadius: 30,
+    left: 16,
+    right: 16,
+    bottom: 18,
+    height: 58,
+    borderRadius: 29,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.55, shadowRadius: 20,
@@ -235,9 +226,10 @@ const styles = StyleSheet.create({
   tabBarInner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
     backgroundColor: 'rgba(8,16,36,0.88)',
-    paddingVertical: 13, paddingHorizontal: 8,
+    height: 58,
+    paddingHorizontal: 0,
   },
-  tabItem: { alignItems: 'center', justifyContent: 'center', flex: 1, paddingVertical: 2 },
+  tabItem: { alignItems: 'center', justifyContent: 'center', flex: 1, height: 56 },
   tabIconWrap: { alignItems: 'center', justifyContent: 'center' },
   plusBtn: {
     backgroundColor: 'rgba(74,158,255,0.28)',

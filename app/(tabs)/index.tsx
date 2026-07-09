@@ -130,46 +130,47 @@ export default function HomeScreen() {
         </View>
 
         {/* Actividad Reciente */}
-        <ScrollView
-          style={styles.actividadScroll}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 24 }}
-        >
+        <View style={styles.actividadSection}>
           <Text style={styles.sectionTitle}>Actividad Reciente</Text>
-          {actividad.length === 0 ? (
-            <View style={[styles.card, styles.emptyCard]}>
-              <Ionicons name="receipt-outline" size={28} color="rgba(255,255,255,0.25)" />
-              <Text style={styles.emptyText}>Sin actividad reciente</Text>
-            </View>
-          ) : (
-            actividad.map(item => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.actividadCard}
-                activeOpacity={0.75}
-                onPress={() => router.push({ pathname: '/detalle-grupo', params: { id: item.grupoId, nombre: item.grupoNombre } })}
-              >
-                <View style={styles.actividadIcono}>
-                  <Ionicons name="receipt-outline" size={20} color="#FFFFFF" />
-                </View>
-                <View style={styles.actividadInfo}>
-                  <Text style={styles.actividadNombre}>{item.nombre}</Text>
-                  <Text style={styles.actividadGrupo}>{item.grupoNombre}</Text>
-                  <Text style={styles.actividadFecha}>{formatFecha(item.fecha)}</Text>
-                </View>
-                <View style={styles.actividadDerecha}>
-                  <Text style={[styles.actividadTipo, item.tipo === 'teDeben' ? styles.tipoTeDeben : styles.tipoDebes]}>
-                    {item.tipo === 'teDeben' ? 'Te deben' : 'Debes'}
-                  </Text>
-                  <Text style={[styles.actividadMonto, item.tipo === 'debes' && { color: '#FF4D4D' }]}>
-                    {item.tipo === 'debes' ? '-' : ''}${item.montoUsuario.toLocaleString('es-AR')}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))
-          )}
-
-        </ScrollView>
+          <ScrollView
+            style={styles.actividadScroll}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.actividadScrollContent}
+          >
+            {actividad.length === 0 ? (
+              <View style={[styles.card, styles.emptyCard]}>
+                <Ionicons name="receipt-outline" size={28} color="rgba(255,255,255,0.25)" />
+                <Text style={styles.emptyText}>Sin actividad reciente</Text>
+              </View>
+            ) : (
+              actividad.map(item => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.actividadCard}
+                  activeOpacity={0.75}
+                  onPress={() => router.push({ pathname: '/detalle-grupo', params: { id: item.grupoId, nombre: item.grupoNombre } })}
+                >
+                  <View style={styles.actividadIcono}>
+                    <Ionicons name="receipt-outline" size={20} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.actividadInfo}>
+                    <Text style={styles.actividadNombre}>{item.nombre}</Text>
+                    <Text style={styles.actividadGrupo}>{item.grupoNombre}</Text>
+                    <Text style={styles.actividadFecha}>{formatFecha(item.fecha)}</Text>
+                  </View>
+                  <View style={styles.actividadDerecha}>
+                    <Text style={[styles.actividadTipo, item.tipo === 'teDeben' ? styles.tipoTeDeben : styles.tipoDebes]}>
+                      {item.tipo === 'teDeben' ? 'Te deben' : 'Debes'}
+                    </Text>
+                    <Text style={[styles.actividadMonto, item.tipo === 'debes' && { color: '#FF4D4D' }]}>
+                      {item.tipo === 'debes' ? '-' : ''}${item.montoUsuario.toLocaleString('es-AR')}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </ScrollView>
+        </View>
 
       </Animated.View>
     </ImageBackground>
@@ -190,7 +191,9 @@ const GLASS = {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { flex: 1, paddingTop: 72, paddingHorizontal: 24, paddingBottom: 115 },
+  actividadSection: { flex: 1, minHeight: 0 },
   actividadScroll: { flex: 1 },
+  actividadScrollContent: { paddingBottom: 24 },
   chipsScroll: { marginBottom: 0 },
 
   header: { marginBottom: 28 },
