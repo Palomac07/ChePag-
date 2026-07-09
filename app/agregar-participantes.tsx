@@ -64,6 +64,7 @@ export default function AgregarParticipantesScreen() {
       });
       const { error: insertErr } = await supabase.from('grupos').insert({ id: nuevoId, nombre: nombreGrupo, categoria, monedas: monedaParseada, creador_id: userId });
       if (insertErr) { setError('No se pudo crear el grupo. Volvé e intentá de nuevo.'); setCreandoGrupo(false); return; }
+      await supabase.from('grupo_miembros').insert({ grupo_id: nuevoId, user_id: userId, nombre: nombreUsuario, es_admin: true });
       if (fotoGrupo) {
         try {
           const fotoPath = await uploadTicket(userId, nuevoId, fotoGrupo.base64);
@@ -76,7 +77,6 @@ export default function AgregarParticipantesScreen() {
         }
       }
       clearFotoGrupo();
-      await supabase.from('grupo_miembros').insert({ grupo_id: nuevoId, user_id: userId, nombre: nombreUsuario, es_admin: true });
       setGrupoId(nuevoId);
       setCreandoGrupo(false);
     };
