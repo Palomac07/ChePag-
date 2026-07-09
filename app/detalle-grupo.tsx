@@ -48,6 +48,15 @@ function formatearFecha(iso: string): string {
   return `${d.getDate()} ${meses[d.getMonth()]}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 type MiembroRef = { user_id: string; nombre: string };
 
 // Saldos por identidad estable (user_id) para que un cambio de nombre no parta a
@@ -327,6 +336,42 @@ export default function DetalleGrupoScreen() {
       await guardarArchivo(file.uri, fileName, 'text/csv', csv, 'utf8');
     } catch (e) {
       Alert.alert('Error CSV', String(e));
+    }
+  };
+
+  const exportarExcel = async () => {
+    setExportModalVisible(false);
+    if (Platform.OS !== 'android' && !(await Sharing.isAvailableAsync())) {
+      mostrarPopup('ℹ️', 'No disponible', 'La exportación está disponible en la app móvil.');
+      return;
+    }
+    try {
+      const gastosGrupo = gastos;
+      const balanceExcel = calcularBalance(gastosGrupo, monedas, [], miembrosGrupo);
+      const deudasExcel = calcularDeudas(gastosGrupo, monedas, [], miembrosGrupo);
+      const totalARS = gastosGrupo.reduce((acc, g) => acc + g.monto * (monedasMap[g.moneda]?.tasaARS ?? 1), 0);
+      const fechaReporte = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
+      const totalFmt = `$${Math.round(totalARS).toLocaleString('es-AR')}`;
+      const filasGastos = gastosGrupo.map(g => {
+        const monto = g.moneda !== 'ARS'
+          ? `${g.moneda} ${g.monto.toLocaleString('es-AR')}`
+          : `$${g.monto.toLocaleString('es-AR')}`;
+        const montoARS = Math.round(g.monto * (monedasMap[g.moneda]?.tasaARS ?? 1));
+        return `<tr><td>${escapeHtml(g.nombre)}</td><td>${escapeHtml(g.pagador)}</td><td>${escapeHtml(g.fecha)}</td><td>${escapeHtml(g.moneda)}</td><td class="num">${escapeHtml(monto)}</td><td class="num">$${montoARS.toLocaleString('es-AR')}</td><td>${escapeHtml(g.participantes.join(', '))}</td></tr>`;
+      }).join('');
+      const filasBalance = balanceExcel.map(b => `<tr><td>${escapeHtml(b.nombre)}</td><td class="num">${b.monto >= 0 ? '+' : '-'}$${Math.abs(Math.round(b.monto)).toLocaleString('es-AR')}</td></tr>`).join('');
+      const filasDeudas = deudasExcel.length
+        ? deudasExcel.map(d => `<tr><td>${escapeHtml(d.de)}</td><td>${escapeHtml(d.a)}</td><td class="num">$${Math.round(d.monto).toLocaleString('es-AR')}</td></tr>`).join('')
+        : '<tr><td colspan="3">Todo saldado. No hay deudas pendientes.</td></tr>';
+      const html = `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;color:#1F2A44;}h1{color:#2B4C8C;}h2{color:#2B4C8C;margin-top:26px;}table{border-collapse:collapse;width:100%;margin-bottom:16px;}th{background:#E8F1FB;color:#2B4C8C;font-weight:700;}th,td{border:1px solid #DDE7F3;padding:8px;text-align:left;}tr:nth-child(even){background:#F7FAFE;}.num{text-align:right;white-space:nowrap;}.resumen td{font-weight:700;}</style></head><body><h1>Reporte ${escapeHtml(nombre ?? 'Grupo')}</h1><p>Generado el ${escapeHtml(fechaReporte)}</p><table class="resumen"><tr><td>Total ARS</td><td>${escapeHtml(totalFmt)}</td></tr><tr><td>Gastos</td><td>${gastosGrupo.length}</td></tr><tr><td>Personas</td><td>${balanceExcel.length}</td></tr></table><h2>Gastos</h2><table><thead><tr><th>Nombre</th><th>Pagador</th><th>Fecha</th><th>Moneda</th><th>Monto original</th><th>Monto ARS</th><th>Participantes</th></tr></thead><tbody>${filasGastos}</tbody></table><h2>Balance</h2><table><thead><tr><th>Miembro</th><th>Balance ARS</th></tr></thead><tbody>${filasBalance}</tbody></table><h2>A pagar</h2><table><thead><tr><th>De</th><th>A</th><th>Monto ARS</th></tr></thead><tbody>${filasDeudas}</tbody></table></body></html>`;
+      const fileName = `${nombre ?? 'grupo'}_reporte.xls`;
+      const file = new File(Paths.cache, fileName);
+      if (file.exists) file.delete();
+      file.create();
+      file.write(html);
+      await guardarArchivo(file.uri, fileName, 'application/vnd.ms-excel', html, 'utf8');
+    } catch (e) {
+      Alert.alert('Error Excel', String(e));
     }
   };
 
@@ -1315,11 +1360,14 @@ export default function DetalleGrupoScreen() {
               <Text style={styles.popupModalTitulo}>Exportar gastos</Text>
               <Text style={styles.popupModalMensaje}>¿En qué formato querés exportar?</Text>
               <View style={{ width: '100%', gap: 10 }}>
-                <TouchableOpacity style={styles.exportOpcionBtn} onPress={exportarCSV}>
-                  <Text style={styles.exportOpcionText}>📊 Exportar como Excel (CSV)</Text>
+                <TouchableOpacity style={styles.exportOpcionBtn} onPress={exportarExcel}>
+                  <Text style={styles.exportOpcionText}>📊 Exportar como Excel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.exportOpcionBtn, { backgroundColor: '#4A9EFF' }]} onPress={exportarPDF}>
                   <Text style={styles.exportOpcionText}>📄 Exportar como PDF</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.exportOpcionBtn, { backgroundColor: '#6B7A99' }]} onPress={exportarCSV}>
+                  <Text style={styles.exportOpcionText}>CSV</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.popupModalCancelar, { flex: 0, width: '100%' }]} onPress={() => setExportModalVisible(false)}>
                   <Text style={styles.popupModalCancelarText}>Cancelar</Text>

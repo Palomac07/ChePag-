@@ -60,14 +60,14 @@ export default function PerfilScreen() {
     router.replace('/login');
   };
 
-  const inicial = nombre ? nombre[0].toUpperCase() : '?';
+  const inicial = nombre.trim().charAt(0).toUpperCase();
 
   return (
     <ImageBackground source={BG} style={styles.root} resizeMode="cover" imageStyle={{ transform: [{ scale: 1.08 }] }}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Perfil</Text>
         <View style={styles.avatarCircle}>
-          <Text style={styles.avatarLetra}>{inicial}</Text>
+          {inicial ? <Text style={styles.avatarLetra}>{inicial}</Text> : null}
         </View>
         <Text style={styles.nombre}>{nombre || 'Mi perfil'}</Text>
       </View>
