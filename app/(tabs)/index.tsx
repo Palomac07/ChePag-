@@ -135,6 +135,7 @@ export default function HomeScreen() {
           <ScrollView
             style={styles.actividadScroll}
             showsVerticalScrollIndicator={false}
+            overScrollMode="never"
             contentContainerStyle={styles.actividadScrollContent}
           >
             {actividad.length === 0 ? (
@@ -191,8 +192,8 @@ const GLASS = {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { flex: 1, paddingTop: 72, paddingHorizontal: 24, paddingBottom: 115 },
-  actividadSection: { flex: 1, minHeight: 0 },
-  actividadScroll: { flex: 1 },
+  actividadSection: { flex: 1, minHeight: 0, backgroundColor: 'transparent' },
+  actividadScroll: { flex: 1, backgroundColor: 'transparent' },
   actividadScrollContent: { paddingBottom: 24 },
   chipsScroll: { marginBottom: 0 },
 
