@@ -230,6 +230,9 @@ const styles = StyleSheet.create({
     ...GLASS,
     flexDirection: 'row', alignItems: 'center',
     padding: 14, marginBottom: 10, borderRadius: 16,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   actividadIcono: {
     width: 42, height: 42, borderRadius: 12,
