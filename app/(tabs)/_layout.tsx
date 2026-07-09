@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import PagerView from '@/components/PagerViewCompat';
@@ -48,9 +48,13 @@ export default function TabLayout() {
 function TabsContent() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
   const pagerRef = useRef<PagerView>(null);
   const [activeIdx, setActiveIdx] = useState(0);
   const [accionesVisible, setAccionesVisible] = useState(false);
+  const compactPhone = width < 380 || height < 720;
+  const tabHorizontalMargin = compactPhone ? 14 : 20;
+  const tabBottomOffset = Math.max(8, insets.bottom + (compactPhone ? 2 : 6));
 
   const { startTour } = useTour();
   const tourRefs = {
@@ -126,7 +130,14 @@ function TabsContent() {
         ))}
       </PagerView>
 
-      <View style={[styles.tabBarWrap, { bottom: 20 + insets.bottom }]}>
+      <View style={[
+        styles.tabBarWrap,
+        {
+          left: tabHorizontalMargin,
+          right: tabHorizontalMargin,
+          bottom: tabBottomOffset,
+        },
+      ]}>
         <View style={styles.tabBarInner}>
           {TABS.map(tab => {
             const isActive = tab.pageIdx === activeIdx;
@@ -214,7 +225,7 @@ const styles = StyleSheet.create({
   page: { flex: 1 },
 
   tabBarWrap: {
-    position: 'absolute', left: 20, right: 20,
+    position: 'absolute',
     borderRadius: 30,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
