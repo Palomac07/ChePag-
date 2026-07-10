@@ -12,6 +12,7 @@ import { needsRatesFetch, fetchRatesMap } from '@/lib/ratesCache';
 import { uploadTicket, getSignedUrl, deleteTicket, type ImagenElegida } from '@/lib/ticketImage';
 import ImageSourceModal from '@/components/ImageSourceModal';
 import { useImagePicker } from '@/hooks/useImagePicker';
+import { firstNameOr } from '@/lib/displayName';
 
 const BG = require('@/assets/images/bg.png');
 
@@ -191,7 +192,7 @@ export default function AgregarGastoScreen() {
       titulo: m.user_id === userId ? '✅ Gasto registrado' : 'Nuevo gasto en el grupo',
       mensaje: m.user_id === userId
         ? `Registraste "${nombreGasto.trim()}" por $${Number(monto).toLocaleString('es-AR')} en ${grupoSeleccionado}.`
-        : `${pagadorNombre} agregó "${nombreGasto.trim()}" por $${Number(monto).toLocaleString('es-AR')} en ${grupoSeleccionado}.`,
+        : `${firstNameOr(pagadorNombre)} agregó "${nombreGasto.trim()}" por $${Number(monto).toLocaleString('es-AR')} en ${grupoSeleccionado}.`,
       data: { grupo_id: grupoActual?.id, grupo_nombre: grupoSeleccionado },
     }));
     if (notifs.length > 0) await supabase.from('notificaciones').insert(notifs);
@@ -289,14 +290,14 @@ export default function AgregarGastoScreen() {
               <Text style={styles.label}>¿Quién pagó?</Text>
               <View style={styles.dropdownWrapper}>
                 <TouchableOpacity style={styles.dropdown} onPress={() => setPagadorDropdown(!pagadorDropdown)}>
-                  <Text style={[styles.dropdownText, { color: '#FFFFFF' }]}>{pagadorNombre || 'Seleccioná quién pagó'}</Text>
+                  <Text style={[styles.dropdownText, { color: '#FFFFFF' }]}>{pagadorNombre ? firstNameOr(pagadorNombre) : 'Seleccioná quién pagó'}</Text>
                   <Ionicons name={pagadorDropdown ? 'chevron-up' : 'chevron-down'} size={16} color="rgba(255,255,255,0.4)" />
                 </TouchableOpacity>
                 {pagadorDropdown && (
                   <View style={styles.dropdownMenu}>
                     {miembrosGrupo.map(m => (
                       <TouchableOpacity key={m.user_id} style={styles.dropdownItem} onPress={() => { setPagadorId(m.user_id); setPagadorNombre(m.nombre); setPagadorDropdown(false); }}>
-                        <Text style={styles.dropdownItemText}>{m.nombre}{m.user_id === userId ? ' (vos)' : ''}</Text>
+                        <Text style={styles.dropdownItemText}>{firstNameOr(m.nombre)}{m.user_id === userId ? ' (vos)' : ''}</Text>
                         {pagadorId === m.user_id && <Ionicons name="checkmark" size={16} color="#4A9EFF" />}
                       </TouchableOpacity>
                     ))}
@@ -311,14 +312,14 @@ export default function AgregarGastoScreen() {
             <View style={styles.dropdownWrapper}>
               <TouchableOpacity style={[styles.dropdown, errores.miembros && styles.inputError]} onPress={() => { setMiembrosDropdown(!miembrosDropdown); setErrores(e => ({ ...e, miembros: '' })); }}>
                 <Text style={[styles.dropdownText, miembrosSeleccionados.length > 0 && { color: '#FFFFFF' }]}>
-                  {miembrosSeleccionados.length > 0 ? miembrosSeleccionados.map(m => m.nombre).join(', ') : 'Seleccioná participantes'}
+                  {miembrosSeleccionados.length > 0 ? miembrosSeleccionados.map(m => firstNameOr(m.nombre)).join(', ') : 'Seleccioná participantes'}
                 </Text>
               </TouchableOpacity>
               {miembrosDropdown && (
                 <View style={styles.dropdownMenu}>
                   {miembrosGrupo.map(m => (
                     <TouchableOpacity key={m.user_id} style={styles.dropdownItem} onPress={() => toggleMiembro(m)}>
-                      <Text style={styles.dropdownItemText}>{m.nombre}{m.user_id === userId ? ' (vos)' : ''}</Text>
+                      <Text style={styles.dropdownItemText}>{firstNameOr(m.nombre)}{m.user_id === userId ? ' (vos)' : ''}</Text>
                       {miembrosSeleccionados.find(x => x.user_id === m.user_id) && <Ionicons name="checkmark" size={16} color="#4A9EFF" />}
                     </TouchableOpacity>
                   ))}

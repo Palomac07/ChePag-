@@ -8,6 +8,7 @@ import { useAmistadStore } from '@/store/useAmistadStore';
 import { useNotificacionesStore } from '@/store/useNotificacionesStore';
 import { supabase } from '@/lib/supabase';
 import { useTour } from '@/components/tour/TourProvider';
+import { firstName, firstNameOr } from '@/lib/displayName';
 
 const BG = require('@/assets/images/bg.png');
 
@@ -60,7 +61,7 @@ export default function PerfilScreen() {
     router.replace('/login');
   };
 
-  const inicial = nombre.trim().charAt(0).toUpperCase();
+  const inicial = firstName(nombre).charAt(0).toUpperCase();
 
   return (
     <ImageBackground source={BG} style={styles.root} resizeMode="cover" imageStyle={{ transform: [{ scale: 1.08 }] }}>
@@ -69,7 +70,7 @@ export default function PerfilScreen() {
         <View style={styles.avatarCircle}>
           {inicial ? <Text style={styles.avatarLetra}>{inicial}</Text> : null}
         </View>
-        <Text style={styles.nombre}>{nombre || 'Mi perfil'}</Text>
+        <Text style={styles.nombre}>{firstNameOr(nombre, 'Mi perfil')}</Text>
       </View>
 
       <ScrollView style={styles.body} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>

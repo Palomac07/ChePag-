@@ -8,6 +8,7 @@ import { esTelefonoValido, esFechaValida, formatearFechaInput } from '@/utils/va
 import SwipeBackWrapper from '@/components/SwipeBackWrapper';
 import { useUserStore } from '@/store/useUserStore';
 import { supabase } from '@/lib/supabase';
+import { firstName, firstNameOr } from '@/lib/displayName';
 
 const BG = require('@/assets/images/bg.png');
 
@@ -101,7 +102,7 @@ export default function EditarPerfilScreen() {
     setPopupDesvincular(false);
   };
 
-  const inicial = nombre ? nombre[0].toUpperCase() : '?';
+  const inicial = firstName(nombre)[0]?.toUpperCase() ?? '?';
 
   return (
     <SwipeBackWrapper>
@@ -120,7 +121,7 @@ export default function EditarPerfilScreen() {
               <View style={styles.avatarCircle}>
                 <Text style={styles.avatarLetra}>{inicial}</Text>
               </View>
-              <Text style={styles.nombre}>{nombre || 'Mi perfil'}</Text>
+              <Text style={styles.nombre}>{firstNameOr(nombre, 'Mi perfil')}</Text>
               {username ? <Text style={styles.usernameLabel}>@{username}</Text> : null}
             </View>
 

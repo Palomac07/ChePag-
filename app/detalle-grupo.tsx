@@ -24,6 +24,7 @@ import InvitarSheet from '@/components/InvitarSheet';
 import { CHEPAGA_LOGO_DATA_URI } from '@/constants/logoBase64';
 import ImageSourceModal from '@/components/ImageSourceModal';
 import { useImagePicker } from '@/hooks/useImagePicker';
+import { firstName, firstNameOr } from '@/lib/displayName';
 
 const BG = require('@/assets/images/bg.png');
 
@@ -140,6 +141,7 @@ export default function DetalleGrupoScreen() {
   const pausarGrupo = useGruposStore(s => s.pausarGrupo);
   const reanudarGrupo = useGruposStore(s => s.reanudarGrupo);
   const salirGrupo = useGruposStore(s => s.salirGrupo);
+  const eliminarGrupo = useGruposStore(s => s.eliminarGrupo);
   const actualizarMonedas = useGruposStore(s => s.actualizarMonedas);
   const hacerAdmin = useGruposStore(s => s.hacerAdmin);
   const quitarAdmin = useGruposStore(s => s.quitarAdmin);
@@ -271,7 +273,7 @@ export default function DetalleGrupoScreen() {
   });
   const [popupEliminarAmigo, setPopupEliminarAmigo] = useState<{ visible: boolean; amistadId: string; amigoUserId: string; amigoNombre: string } | null>(null);
   const [menuVisible, setMenuVisible] = useState(false);
-  const [popupConfirm, setPopupConfirm] = useState<{ visible: boolean; accion: 'salir' | 'pausar' | null }>({ visible: false, accion: null });
+  const [popupConfirm, setPopupConfirm] = useState<{ visible: boolean; accion: 'salir' | 'pausar' | 'eliminarGrupo' | null }>({ visible: false, accion: null });
   const [presupuesto, setPresupuesto] = useState<number | null>(grupo?.presupuesto ?? null);
   const [inputPresupuesto, setInputPresupuesto] = useState('');
   const [editandoPresupuesto, setEditandoPresupuesto] = useState(false);
@@ -366,33 +368,9 @@ export default function DetalleGrupoScreen() {
     }
     // iOS: esperar a que el modal de exportar termine de cerrarse antes de presentar
     // la hoja de compartir. Si se presenta mientras el modal se está cerrando, iOS
-    // descarta la presentación y no aparece nada (el CSV "no se descarga").
+    // puede descartar la presentación.
     if (Platform.OS === 'ios') await new Promise(r => setTimeout(r, 500));
     await Sharing.shareAsync(fileUri, { mimeType, dialogTitle: 'Guardar o compartir' });
-  };
-
-  const exportarCSV = async () => {
-    setExportModalVisible(false);
-    if (Platform.OS !== 'android' && !(await Sharing.isAvailableAsync())) {
-      mostrarPopup('ℹ️', 'No disponible', 'La exportación está disponible en la app móvil.');
-      return;
-    }
-    try {
-      const gastosGrupo = gastos;
-      const filas = [
-        ['Nombre', 'Pagador', 'Fecha', 'Monto', 'Moneda', 'Participantes'],
-        ...gastosGrupo.map(g => [g.nombre, g.pagador, g.fecha, String(g.monto), g.moneda, g.participantes.join(' - ')]),
-      ];
-      const csv = filas.map(f => f.map(v => `"${v}"`).join(',')).join('\n');
-      const fileName = `${nombre ?? 'grupo'}_gastos.csv`;
-      const file = new File(Paths.cache, fileName);
-      if (file.exists) file.delete();
-      file.create();
-      file.write(csv);
-      await guardarArchivo(file.uri, fileName, 'text/csv', csv, 'utf8');
-    } catch (e) {
-      Alert.alert('Error CSV', String(e));
-    }
   };
 
   const exportarExcel = async () => {
@@ -408,24 +386,58 @@ export default function DetalleGrupoScreen() {
       const totalARS = gastosGrupo.reduce((acc, g) => acc + g.monto * (monedasMap[g.moneda]?.tasaARS ?? 1), 0);
       const fechaReporte = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
       const totalFmt = `$${Math.round(totalARS).toLocaleString('es-AR')}`;
-      const filasGastos = gastosGrupo.map(g => {
-        const monto = g.moneda !== 'ARS'
-          ? `${g.moneda} ${g.monto.toLocaleString('es-AR')}`
-          : `$${g.monto.toLocaleString('es-AR')}`;
-        const montoARS = Math.round(g.monto * (monedasMap[g.moneda]?.tasaARS ?? 1));
-        return `<tr><td>${escapeHtml(g.nombre)}</td><td>${escapeHtml(g.pagador)}</td><td>${escapeHtml(g.fecha)}</td><td>${escapeHtml(g.moneda)}</td><td class="num">${escapeHtml(monto)}</td><td class="num">$${montoARS.toLocaleString('es-AR')}</td><td>${escapeHtml(g.participantes.join(', '))}</td></tr>`;
-      }).join('');
-      const filasBalance = balanceExcel.map(b => `<tr><td>${escapeHtml(b.nombre)}</td><td class="num">${b.monto >= 0 ? '+' : '-'}$${Math.abs(Math.round(b.monto)).toLocaleString('es-AR')}</td></tr>`).join('');
-      const filasDeudas = deudasExcel.length
-        ? deudasExcel.map(d => `<tr><td>${escapeHtml(d.de)}</td><td>${escapeHtml(d.a)}</td><td class="num">$${Math.round(d.monto).toLocaleString('es-AR')}</td></tr>`).join('')
-        : '<tr><td colspan="3">Todo saldado. No hay deudas pendientes.</td></tr>';
-      const html = `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;color:#1F2A44;}h1{color:#2B4C8C;}h2{color:#2B4C8C;margin-top:26px;}table{border-collapse:collapse;width:100%;margin-bottom:16px;}th{background:#E8F1FB;color:#2B4C8C;font-weight:700;}th,td{border:1px solid #DDE7F3;padding:8px;text-align:left;}tr:nth-child(even){background:#F7FAFE;}.num{text-align:right;white-space:nowrap;}.resumen td{font-weight:700;}</style></head><body><h1>Reporte ${escapeHtml(nombre ?? 'Grupo')}</h1><p>Generado el ${escapeHtml(fechaReporte)}</p><table class="resumen"><tr><td>Total ARS</td><td>${escapeHtml(totalFmt)}</td></tr><tr><td>Gastos</td><td>${gastosGrupo.length}</td></tr><tr><td>Personas</td><td>${balanceExcel.length}</td></tr></table><h2>Gastos</h2><table><thead><tr><th>Nombre</th><th>Pagador</th><th>Fecha</th><th>Moneda</th><th>Monto original</th><th>Monto ARS</th><th>Participantes</th></tr></thead><tbody>${filasGastos}</tbody></table><h2>Balance</h2><table><thead><tr><th>Miembro</th><th>Balance ARS</th></tr></thead><tbody>${filasBalance}</tbody></table><h2>A pagar</h2><table><thead><tr><th>De</th><th>A</th><th>Monto ARS</th></tr></thead><tbody>${filasDeudas}</tbody></table></body></html>`;
+      const cell = (value: unknown, type: 'String' | 'Number' = 'String') =>
+        `<Cell><Data ss:Type="${type}">${escapeHtml(value)}</Data></Cell>`;
+      const row = (values: (string | number)[], numeric: number[] = []) =>
+        `<Row>${values.map((v, i) => cell(v, numeric.includes(i) ? 'Number' : 'String')).join('')}</Row>`;
+      const sheet = (sheetName: string, rows: string[]) =>
+        `<Worksheet ss:Name="${escapeHtml(sheetName)}"><Table>${rows.join('')}</Table></Worksheet>`;
+      const resumenRows = [
+        row(['Reporte', nombre ?? 'Grupo']),
+        row(['Generado', fechaReporte]),
+        row(['Total ARS', Math.round(totalARS)], [1]),
+        row(['Total formateado', totalFmt]),
+        row(['Gastos', gastosGrupo.length], [1]),
+        row(['Personas', balanceExcel.length], [1]),
+      ];
+      const gastosRows = [
+        row(['Nombre', 'Pagador', 'Fecha', 'Moneda', 'Monto original', 'Monto ARS', 'Participantes']),
+        ...gastosGrupo.map(g => row([
+          g.nombre,
+          firstNameOr(g.pagador),
+          g.fecha,
+          g.moneda,
+          g.monto,
+          Math.round(g.monto * (monedasMap[g.moneda]?.tasaARS ?? 1)),
+          g.participantes.map(p => firstNameOr(p)).join(', '),
+        ], [4, 5])),
+      ];
+      const balanceRows = [
+        row(['Miembro', 'Balance ARS']),
+        ...balanceExcel.map(b => row([firstNameOr(b.nombre), Math.round(b.monto)], [1])),
+      ];
+      const deudasRows = deudasExcel.length
+        ? [
+          row(['De', 'A', 'Monto ARS']),
+          ...deudasExcel.map(d => row([firstNameOr(d.de), firstNameOr(d.a), Math.round(d.monto)], [2])),
+        ]
+        : [row(['Todo saldado', 'No hay deudas pendientes.'])];
+      const excelXml = `<?xml version="1.0" encoding="UTF-8"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ ${sheet('Resumen', resumenRows)}
+ ${sheet('Gastos', gastosRows)}
+ ${sheet('Balance', balanceRows)}
+ ${sheet('A pagar', deudasRows)}
+</Workbook>`;
       const fileName = `${nombre ?? 'grupo'}_reporte.xls`;
       const file = new File(Paths.cache, fileName);
       if (file.exists) file.delete();
       file.create();
-      file.write(html);
-      await guardarArchivo(file.uri, fileName, 'application/vnd.ms-excel', html, 'utf8');
+      file.write(excelXml);
+      await guardarArchivo(file.uri, fileName, 'application/vnd.ms-excel', excelXml, 'utf8');
     } catch (e) {
       Alert.alert('Error Excel', String(e));
     }
@@ -442,9 +454,9 @@ export default function DetalleGrupoScreen() {
       const balancePDF = calcularBalance(gastosGrupo, monedas, [], miembrosGrupo);
       const deudasPDF = calcularDeudas(gastosGrupo, monedas, [], miembrosGrupo);
       const totalARS = gastosGrupo.reduce((acc, g) => acc + g.monto * (monedasMap[g.moneda]?.tasaARS ?? 1), 0);
-      const filasGastos = gastosGrupo.map(g => `<tr><td>${g.nombre}</td><td>${g.pagador}</td><td>${g.fecha}</td><td class="amount">${g.moneda !== 'ARS' ? `${g.moneda} ${g.monto.toLocaleString('es-AR')}` : `$${g.monto.toLocaleString('es-AR')}`}</td><td>${g.participantes.join(', ')}</td></tr>`).join('');
-      const filasBalance = balancePDF.map(b => `<tr><td>${b.nombre}</td><td style="text-align:right"><span class="pill ${b.monto >= 0 ? 'pos' : 'neg'}">${b.monto >= 0 ? '+' : '−'}$${Math.abs(b.monto).toLocaleString('es-AR')}</span></td></tr>`).join('');
-      const filasDeudas = deudasPDF.map(d => `<tr><td><strong>${d.de}</strong></td><td class="arrow">→</td><td><strong>${d.a}</strong></td><td class="amount">$${d.monto.toLocaleString('es-AR')}</td></tr>`).join('');
+      const filasGastos = gastosGrupo.map(g => `<tr><td>${g.nombre}</td><td>${firstNameOr(g.pagador)}</td><td>${g.fecha}</td><td class="amount">${g.moneda !== 'ARS' ? `${g.moneda} ${g.monto.toLocaleString('es-AR')}` : `$${g.monto.toLocaleString('es-AR')}`}</td><td>${g.participantes.map(p => firstNameOr(p)).join(', ')}</td></tr>`).join('');
+      const filasBalance = balancePDF.map(b => `<tr><td>${firstNameOr(b.nombre)}</td><td style="text-align:right"><span class="pill ${b.monto >= 0 ? 'pos' : 'neg'}">${b.monto >= 0 ? '+' : '−'}$${Math.abs(b.monto).toLocaleString('es-AR')}</span></td></tr>`).join('');
+      const filasDeudas = deudasPDF.map(d => `<tr><td><strong>${firstNameOr(d.de)}</strong></td><td class="arrow">→</td><td><strong>${firstNameOr(d.a)}</strong></td><td class="amount">$${d.monto.toLocaleString('es-AR')}</td></tr>`).join('');
       const seccionDeudas = deudasPDF.length > 0
         ? `<div class="card"><table><thead><tr><th>De</th><th></th><th>A</th><th style="text-align:right">Monto</th></tr></thead><tbody>${filasDeudas}</tbody></table></div>`
         : `<div class="saldado">✅ ¡Todo saldado! No hay deudas pendientes.</div>`;
@@ -698,7 +710,7 @@ export default function DetalleGrupoScreen() {
     }
     setEliminandoMiembro(false);
     setMiembroAEliminar(null);
-    if (ok) mostrarPopup('👋', 'Miembro eliminado', `${m.nombre} ya no forma parte del grupo.`);
+    if (ok) mostrarPopup('👋', 'Miembro eliminado', `${firstNameOr(m.nombre)} ya no forma parte del grupo.`);
     else mostrarPopup('❌', 'Error', 'No se pudo eliminar al miembro. Intentá de nuevo.');
   };
 
@@ -711,7 +723,7 @@ export default function DetalleGrupoScreen() {
       sender_id: userId,
       tipo: 'pago_pendiente',
       titulo: 'Confirmación de pago',
-      mensaje: `${item.de} dice que te pagó $${item.monto.toLocaleString('es-AR')} en ${nombre ?? 'el grupo'}. ¿Confirmás?`,
+      mensaje: `${firstNameOr(item.de)} dice que te pagó $${item.monto.toLocaleString('es-AR')} en ${nombre ?? 'el grupo'}. ¿Confirmás?`,
       data: {
         grupo_id: id,
         grupo_nombre: nombre,
@@ -723,7 +735,7 @@ export default function DetalleGrupoScreen() {
     });
     if (error) { mostrarPopup('❌', 'Error', 'No se pudo enviar el aviso. Asegurate de tener conexión.'); return; }
     setPagosPendientesLocal(prev => [...prev, { de: item.de, a: item.a }]);
-    mostrarPopup('⏳', 'Pago enviado', `Le avisamos a ${item.a} que ${item.de} le pagó. Esperá su confirmación.`);
+    mostrarPopup('⏳', 'Pago enviado', `Le avisamos a ${firstNameOr(item.a)} que ${firstNameOr(item.de)} le pagó. Esperá su confirmación.`);
   };
 
   return (
@@ -771,6 +783,11 @@ export default function DetalleGrupoScreen() {
                   <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setPopupConfirm({ visible: true, accion: 'pausar' }); }}>
                     <Text style={styles.menuItemEmoji}>{grupoPausado ? '▶️' : '⏸️'}</Text>
                     <Text style={styles.menuItemText}>{grupoPausado ? 'Reanudar grupo' : 'Pausar grupo'}</Text>
+                  </TouchableOpacity>
+                  <View style={styles.menuSeparador} />
+                  <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setPopupConfirm({ visible: true, accion: 'eliminarGrupo' }); }}>
+                    <Text style={styles.menuItemEmoji}>🗑️</Text>
+                    <Text style={[styles.menuItemText, { color: '#FF4D4D' }]}>Eliminar grupo</Text>
                   </TouchableOpacity>
                   <View style={styles.menuSeparador} />
                 </>
@@ -847,10 +864,10 @@ export default function DetalleGrupoScreen() {
                         <Text style={styles.avatarLetra}>{item.de[0]}</Text>
                       </View>
                       <View style={styles.cardInfo}>
-                        <Text style={styles.cardTitulo}>{item.de} → {item.a}</Text>
+                        <Text style={styles.cardTitulo}>{firstNameOr(item.de)} → {firstNameOr(item.a)}</Text>
                         <View style={styles.debeRow}>
                           <Text style={styles.debeText}>
-                            {item.de} debe transferirle ${item.monto.toLocaleString('es-AR')} a {item.a}
+                            {firstNameOr(item.de)} debe transferirle ${item.monto.toLocaleString('es-AR')} a {firstNameOr(item.a)}
                           </Text>
                         </View>
                         {tieneVariasMonedas && (
@@ -876,7 +893,7 @@ export default function DetalleGrupoScreen() {
                           </View>
                         )}
                         {esAcreedor && (
-                          <TouchableOpacity style={styles.recordatorioBtn} onPress={() => mostrarPopup('🔔', '¡Recordatorio enviado!', `Le avisamos a ${item.de} que te debe $${item.monto.toLocaleString('es-AR')}.`)}>
+                          <TouchableOpacity style={styles.recordatorioBtn} onPress={() => mostrarPopup('🔔', '¡Recordatorio enviado!', `Le avisamos a ${firstNameOr(item.de)} que te debe $${item.monto.toLocaleString('es-AR')}.`)}>
                             <Text style={styles.recordatorioText}>🔔  Enviar Recordatorio</Text>
                           </TouchableOpacity>
                         )}
@@ -951,11 +968,11 @@ export default function DetalleGrupoScreen() {
                   <TouchableOpacity style={styles.cardRow} activeOpacity={0.82} onPress={() => setGastoDetalle(g)}>
                     <View style={styles.cardInfo}>
                       <Text style={styles.cardTitulo}>{g.nombre}</Text>
-                      <Text style={styles.cardSub}>{g.pagador} pagó</Text>
+                      <Text style={styles.cardSub}>{firstNameOr(g.pagador)} pagó</Text>
                       <Text style={styles.cardFecha}>{g.fecha}. Dividido entre {g.participantes.length}</Text>
                       <View style={styles.chips}>
                         {g.participantes.map((p) => (
-                          <View key={p} style={styles.chip}><Text style={styles.chipText}>{p}</Text></View>
+                          <View key={p} style={styles.chip}><Text style={styles.chipText}>{firstNameOr(p)}</Text></View>
                         ))}
                       </View>
                       {g.fotoPath && (
@@ -1011,7 +1028,7 @@ export default function DetalleGrupoScreen() {
                         b.monto > 0 ? styles.barPositivo : styles.barNegativo
                       ]} />
                     </View>
-                    <Text style={styles.barLabel}>{b.nombre}</Text>
+                    <Text style={styles.barLabel}>{firstNameOr(b.nombre)}</Text>
                   </View>
                 ))}
               </View>
@@ -1019,7 +1036,7 @@ export default function DetalleGrupoScreen() {
                 <Text style={styles.porPersonaTitulo}>Por Persona</Text>
                 {balance.map((b) => (
                   <View key={b.nombre} style={styles.porPersonaRow}>
-                    <Text style={styles.porPersonaNombre}>{b.nombre}</Text>
+                    <Text style={styles.porPersonaNombre}>{firstNameOr(b.nombre)}</Text>
                     <View style={styles.porPersonaBarBg}>
                       <View style={[
                         styles.porPersonaBarFill,
@@ -1062,7 +1079,7 @@ export default function DetalleGrupoScreen() {
                     ].map((d, i) => (
                       <View key={i} style={styles.destacadoCard}>
                         <Text style={styles.destacadoEmoji}>{d.emoji}</Text>
-                        <Text style={styles.destacadoNombre}>{d.persona.nombre}</Text>
+                        <Text style={styles.destacadoNombre}>{firstNameOr(d.persona.nombre)}</Text>
                         <Text style={styles.destacadoTitulo}>{d.titulo}</Text>
                       </View>
                     ))}
@@ -1076,7 +1093,7 @@ export default function DetalleGrupoScreen() {
                           <View style={[styles.rankingBadge, { backgroundColor: colores[i] }]}>
                             <Text style={styles.rankingPos}>{i + 1}</Text>
                           </View>
-                          <Text style={styles.rankingNombre}>{r.nombre}</Text>
+                          <Text style={styles.rankingNombre}>{firstNameOr(r.nombre)}</Text>
                           <Text style={styles.rankingTitulo}>{titulos[i]}</Text>
                         </View>
                       );
@@ -1108,11 +1125,11 @@ export default function DetalleGrupoScreen() {
               return (
                 <View key={m.user_id} style={styles.miembroCard}>
                   <View style={[styles.miembroAvatar, { backgroundColor: m.color }]}>
-                    <Text style={styles.miembroInicial}>{m.nombre[0].toUpperCase()}</Text>
+                    <Text style={styles.miembroInicial}>{firstName(m.nombre)[0]?.toUpperCase() ?? '?'}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <View style={styles.miembroNombreRow}>
-                      <Text style={styles.miembroNombre}>{m.nombre}{esSelf ? ' (vos)' : ''}</Text>
+                      <Text style={styles.miembroNombre}>{firstNameOr(m.nombre)}{esSelf ? ' (vos)' : ''}</Text>
                       {esAdminMiembro && (
                         <View style={styles.adminBadge}>
                           <Text style={styles.adminBadgeText}>👑 Admin</Text>
@@ -1124,7 +1141,7 @@ export default function DetalleGrupoScreen() {
                     {esAdmin && !esSelf && !esAdminMiembro && (
                       <TouchableOpacity
                         style={styles.agregarAmigoBtn}
-                        onPress={() => { hacerAdmin(id!, m.user_id); mostrarPopup('👑', '¡Admin asignado!', `${m.nombre} ahora es administrador del grupo.`); }}
+                        onPress={() => { hacerAdmin(id!, m.user_id); mostrarPopup('👑', '¡Admin asignado!', `${firstNameOr(m.nombre)} ahora es administrador del grupo.`); }}
                       >
                         <Text style={styles.agregarAmigoText}>+ Admin</Text>
                       </TouchableOpacity>
@@ -1132,7 +1149,7 @@ export default function DetalleGrupoScreen() {
                     {esCreador && !esSelf && esAdminMiembro && (
                       <TouchableOpacity
                         style={[styles.agregarAmigoBtn, styles.agregarAmigoBtnActivo]}
-                        onPress={() => { quitarAdmin(id!, m.user_id); mostrarPopup('👤', 'Admin removido', `${m.nombre} ya no es administrador.`); }}
+                        onPress={() => { quitarAdmin(id!, m.user_id); mostrarPopup('👤', 'Admin removido', `${firstNameOr(m.nombre)} ya no es administrador.`); }}
                       >
                         <Text style={[styles.agregarAmigoText, styles.agregarAmigoTextActivo]}>✓ Admin</Text>
                       </TouchableOpacity>
@@ -1146,7 +1163,7 @@ export default function DetalleGrupoScreen() {
                       esAmigo ? (
                         <TouchableOpacity
                           style={[styles.agregarAmigoBtn, styles.agregarAmigoBtnActivo]}
-                          onPress={() => setPopupEliminarAmigo({ visible: true, amistadId: amigoData.amistad_id, amigoUserId: m.user_id, amigoNombre: m.nombre })}
+                          onPress={() => setPopupEliminarAmigo({ visible: true, amistadId: amigoData.amistad_id, amigoUserId: m.user_id, amigoNombre: firstNameOr(m.nombre) })}
                         >
                           <Text style={[styles.agregarAmigoText, styles.agregarAmigoTextActivo]}>✓ Amigo</Text>
                         </TouchableOpacity>
@@ -1446,9 +1463,9 @@ export default function DetalleGrupoScreen() {
                   return (
                     <View key={m.user_id} style={styles.configMiembroRow}>
                       <View style={[styles.miembroAvatar, { backgroundColor: m.color, width: 36, height: 36, borderRadius: 18 }]}>
-                        <Text style={styles.miembroInicial}>{m.nombre[0].toUpperCase()}</Text>
+                        <Text style={styles.miembroInicial}>{firstName(m.nombre)[0]?.toUpperCase() ?? '?'}</Text>
                       </View>
-                      <Text style={styles.configMiembroNombre}>{m.nombre}{esSelf ? ' (vos)' : ''}</Text>
+                      <Text style={styles.configMiembroNombre}>{firstNameOr(m.nombre)}{esSelf ? ' (vos)' : ''}</Text>
                       {esAdminMiembro && (
                         <View style={styles.adminBadge}>
                           <Text style={styles.adminBadgeText}>👑 Admin</Text>
@@ -1505,9 +1522,6 @@ export default function DetalleGrupoScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.exportOpcionBtn, { backgroundColor: '#4A9EFF' }]} onPress={exportarPDF}>
                   <Text style={styles.exportOpcionText}>📄 Exportar como PDF</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.exportOpcionBtn, { backgroundColor: '#6B7A99' }]} onPress={exportarCSV}>
-                  <Text style={styles.exportOpcionText}>CSV</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.popupModalCancelar, { flex: 0, width: '100%' }]} onPress={() => setExportModalVisible(false)}>
                   <Text style={styles.popupModalCancelarText}>Cancelar</Text>
@@ -1597,6 +1611,22 @@ export default function DetalleGrupoScreen() {
         />
 
         <ConfirmPopup
+          visible={popupConfirm.visible && popupConfirm.accion === 'eliminarGrupo'}
+          emoji="🗑️"
+          titulo="¿Eliminar grupo?"
+          mensaje={`Se borrará "${nombre ?? 'este grupo'}" con sus gastos, pagos y miembros. Esta acción no se puede deshacer.`}
+          confirmText="Eliminar"
+          onCancel={() => setPopupConfirm({ visible: false, accion: null })}
+          onClose={async () => {
+            if (!id) return;
+            const ok = await eliminarGrupo(id);
+            setPopupConfirm({ visible: false, accion: null });
+            if (ok) router.replace('/(tabs)/grupos');
+            else mostrarPopup('❌', 'No se pudo eliminar', 'Intentá de nuevo o revisá tu conexión.');
+          }}
+        />
+
+        <ConfirmPopup
           visible={popupEliminarAmigo?.visible ?? false}
           emoji="👤"
           titulo="¿Eliminar amigo?"
@@ -1627,7 +1657,7 @@ export default function DetalleGrupoScreen() {
           visible={!!miembroAEliminar}
           emoji="👋"
           titulo="¿Eliminar miembro?"
-          mensaje={`${miembroAEliminar?.nombre ?? ''} dejará de formar parte del grupo. Sus gastos registrados se mantienen en el historial.`}
+          mensaje={`${firstNameOr(miembroAEliminar?.nombre, '')} dejará de formar parte del grupo. Sus gastos registrados se mantienen en el historial.`}
           confirmText={eliminandoMiembro ? 'Eliminando...' : 'Expulsar'}
           onCancel={() => { if (!eliminandoMiembro) setMiembroAEliminar(null); }}
           onClose={handleEliminarMiembro}
@@ -1660,7 +1690,7 @@ export default function DetalleGrupoScreen() {
                   <View style={styles.gastoDetalleGrid}>
                     <View style={styles.gastoDetalleItem}>
                       <Text style={styles.gastoDetalleLabel}>Lo pago</Text>
-                      <Text style={styles.gastoDetalleValor}>{gastoDetalle.pagador}</Text>
+                      <Text style={styles.gastoDetalleValor}>{firstNameOr(gastoDetalle.pagador)}</Text>
                     </View>
                     <View style={styles.gastoDetalleItem}>
                       <Text style={styles.gastoDetalleLabel}>Fecha</Text>
@@ -1679,7 +1709,7 @@ export default function DetalleGrupoScreen() {
                   <Text style={styles.gastoDetalleSeccion}>Participantes</Text>
                   <View style={styles.gastoDetalleParticipantes}>
                     {gastoDetalle.participantes.map(p => (
-                      <View key={p} style={styles.chip}><Text style={styles.chipText}>{p}</Text></View>
+                      <View key={p} style={styles.chip}><Text style={styles.chipText}>{firstNameOr(p)}</Text></View>
                     ))}
                   </View>
 

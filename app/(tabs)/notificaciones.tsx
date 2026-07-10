@@ -5,6 +5,7 @@ import { useAmistadStore } from '@/store/useAmistadStore';
 import { useNotificacionesStore } from '@/store/useNotificacionesStore';
 import { useUserStore } from '@/store/useUserStore';
 import { supabase } from '@/lib/supabase';
+import { firstName, firstNameOr } from '@/lib/displayName';
 
 const BG = require('@/assets/images/bg.png');
 
@@ -77,10 +78,10 @@ export default function NotificacionesScreen() {
                 {solicitudesPendientes.map((s, i) => (
                   <View key={s.id} style={styles.card}>
                     <View style={[styles.avatarCircle, { backgroundColor: COLORES[i % COLORES.length] }]}>
-                      <Text style={styles.avatarLetra}>{s.nombre_solicitante[0].toUpperCase()}</Text>
+                      <Text style={styles.avatarLetra}>{firstName(s.nombre_solicitante)[0]?.toUpperCase() ?? '?'}</Text>
                     </View>
                     <View style={styles.cardInfo}>
-                      <Text style={styles.cardTitulo}>{s.nombre_solicitante}</Text>
+                      <Text style={styles.cardTitulo}>{firstNameOr(s.nombre_solicitante)}</Text>
                       <Text style={styles.cardMensaje}>quiere ser tu amigo/a en ChePaga</Text>
                     </View>
                     <View style={styles.botonesRow}>
@@ -108,10 +109,10 @@ export default function NotificacionesScreen() {
                 {solicitudesEnviadas.map((s, i) => (
                   <View key={s.id} style={styles.card}>
                     <View style={[styles.avatarCircle, { backgroundColor: COLORES[i % COLORES.length] }]}>
-                      <Text style={styles.avatarLetra}>{s.nombre_receptor[0].toUpperCase()}</Text>
+                      <Text style={styles.avatarLetra}>{firstName(s.nombre_receptor)[0]?.toUpperCase() ?? '?'}</Text>
                     </View>
                     <View style={styles.cardInfo}>
-                      <Text style={styles.cardTitulo}>{s.nombre_receptor}</Text>
+                      <Text style={styles.cardTitulo}>{firstNameOr(s.nombre_receptor)}</Text>
                       <Text style={styles.cardMensaje}>Solicitud pendiente</Text>
                     </View>
                     <View style={styles.pendienteBadge}>

@@ -58,6 +58,7 @@ type GruposStore = {
   pausarGrupo: (id: string) => Promise<void>;
   reanudarGrupo: (id: string) => Promise<void>;
   salirGrupo: (id: string) => Promise<void>;
+  eliminarGrupo: (id: string) => Promise<boolean>;
   actualizarMonedas: (id: string, monedas: Moneda[]) => Promise<void>;
   hacerAdmin: (grupoId: string, userId: string) => Promise<void>;
   quitarAdmin: (grupoId: string, userId: string) => Promise<void>;
@@ -227,6 +228,19 @@ export const useGruposStore = create<GruposStore>((set, get) => ({
       await supabase.from('grupo_miembros').delete().eq('grupo_id', id).eq('user_id', user.id);
     }
     set(state => ({ grupos: state.grupos.filter(g => g.id !== id) }));
+  },
+
+  eliminarGrupo: async (id) => {
+    const [{ error: pagosError }, { error: gastosError }, { error: miembrosError }] = await Promise.all([
+      supabase.from('pagos').delete().eq('grupo_id', id),
+      supabase.from('gastos').delete().eq('grupo_id', id),
+      supabase.from('grupo_miembros').delete().eq('grupo_id', id),
+    ]);
+    if (pagosError || gastosError || miembrosError) return false;
+    const { error } = await supabase.from('grupos').delete().eq('id', id);
+    if (error) return false;
+    set(state => ({ grupos: state.grupos.filter(g => g.id !== id) }));
+    return true;
   },
 
   actualizarMonedas: async (id, monedas) => {

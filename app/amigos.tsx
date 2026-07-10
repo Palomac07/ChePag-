@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAmistadStore } from '@/store/useAmistadStore';
 import { useUserStore } from '@/store/useUserStore';
 import { supabase } from '@/lib/supabase';
+import { firstName, firstNameOr } from '@/lib/displayName';
 
 const BG = require('@/assets/images/bg.png');
 const COLORES = ['#9B8EC4', '#7BC4B8', '#6BAED6', '#5BAA9F', '#C084C0', '#4A6580', '#6BAA9F'];
@@ -107,10 +108,10 @@ export default function AmigosScreen() {
                 return (
                   <View key={u.id} style={styles.card}>
                     <View style={[styles.avatar, { backgroundColor: COLORES[i % COLORES.length] }]}>
-                      <Text style={styles.avatarLetra}>{(u.nombre || u.username || '?')[0].toUpperCase()}</Text>
+                      <Text style={styles.avatarLetra}>{(firstName(u.nombre) || u.username || '?')[0].toUpperCase()}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.cardNombre}>{u.nombre}</Text>
+                      <Text style={styles.cardNombre}>{firstNameOr(u.nombre)}</Text>
                       {u.username ? <Text style={styles.cardUsername}>@{u.username}</Text> : null}
                     </View>
                     {esAmigo ? (
@@ -148,9 +149,9 @@ export default function AmigosScreen() {
               {amigos.map((a, i) => (
                 <View key={a.id} style={styles.card}>
                   <View style={[styles.avatar, { backgroundColor: COLORES[i % COLORES.length] }]}>
-                    <Text style={styles.avatarLetra}>{a.nombre[0].toUpperCase()}</Text>
+                    <Text style={styles.avatarLetra}>{firstName(a.nombre)[0]?.toUpperCase() ?? '?'}</Text>
                   </View>
-                  <Text style={styles.cardNombre}>{a.nombre}</Text>
+                  <Text style={styles.cardNombre}>{firstNameOr(a.nombre)}</Text>
                   <View style={styles.amigoTag}>
                     <Text style={styles.amigoTagText}>✓ Amigo</Text>
                   </View>

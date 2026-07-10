@@ -10,6 +10,7 @@ import { useGruposStore } from '@/store/useGruposStore';
 import { useAmistadStore } from '@/store/useAmistadStore';
 import { uploadTicket } from '@/lib/ticketImage';
 import { usePendingGroupPhotoStore } from '@/store/usePendingGroupPhotoStore';
+import { firstName, firstNameOr } from '@/lib/displayName';
 
 const BG = require('@/assets/images/bg.png');
 const COLORES = ['#9B8EC4', '#7BC4B8', '#6BAED6', '#5BAA9F', '#C084C0', '#4A6580', '#6BAA9F'];
@@ -185,10 +186,10 @@ export default function AgregarParticipantesScreen() {
         {resultado && !yaEsAmigo && (
           <View style={styles.amigoItem}>
             <View style={[styles.avatarCircle, { backgroundColor: COLORES[0] }]}>
-              <Text style={styles.avatarLetra}>{resultado.nombre[0].toUpperCase()}</Text>
+              <Text style={styles.avatarLetra}>{firstName(resultado.nombre)[0]?.toUpperCase() ?? '?'}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.amigoNombre}>{resultado.nombre}</Text>
+              <Text style={styles.amigoNombre}>{firstNameOr(resultado.nombre)}</Text>
               <Text style={styles.usernameTag}>@{resultado.username}</Text>
             </View>
             <TouchableOpacity
@@ -205,10 +206,10 @@ export default function AgregarParticipantesScreen() {
         {resultado && yaEsAmigo && (
           <View style={styles.amigoItem}>
             <View style={[styles.avatarCircle, { backgroundColor: COLORES[0] }]}>
-              <Text style={styles.avatarLetra}>{resultado.nombre[0].toUpperCase()}</Text>
+              <Text style={styles.avatarLetra}>{firstName(resultado.nombre)[0]?.toUpperCase() ?? '?'}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.amigoNombre}>{resultado.nombre}</Text>
+              <Text style={styles.amigoNombre}>{firstNameOr(resultado.nombre)}</Text>
               <Text style={styles.usernameTag}>@{resultado.username}</Text>
             </View>
             <View style={styles.yaAmigoTag}>
@@ -245,10 +246,10 @@ export default function AgregarParticipantesScreen() {
             return (
               <TouchableOpacity key={amigo.id} style={[styles.amigoItem, seleccionado && styles.amigoItemActivo]} onPress={() => toggleSeleccionado(amigo)}>
                 <View style={[styles.avatarCircle, { backgroundColor: COLORES[i % COLORES.length] }]}>
-                  <Text style={styles.avatarLetra}>{amigo.nombre[0].toUpperCase()}</Text>
+                  <Text style={styles.avatarLetra}>{firstName(amigo.nombre)[0]?.toUpperCase() ?? '?'}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.amigoNombre}>{amigo.nombre}</Text>
+                  <Text style={styles.amigoNombre}>{firstNameOr(amigo.nombre)}</Text>
                   {amigo.username ? <Text style={styles.usernameTag}>@{amigo.username}</Text> : null}
                 </View>
                 <View style={[styles.checkbox, seleccionado && styles.checkboxActivo]}>
@@ -266,9 +267,9 @@ export default function AgregarParticipantesScreen() {
               {seleccionados.map((u, i) => (
                 <View key={u.id} style={styles.seleccionadoChip}>
                   <View style={[styles.chipAvatar, { backgroundColor: COLORES[i % COLORES.length] }]}>
-                    <Text style={styles.chipLetra}>{u.nombre[0].toUpperCase()}</Text>
+                    <Text style={styles.chipLetra}>{firstName(u.nombre)[0]?.toUpperCase() ?? '?'}</Text>
                   </View>
-                  <Text style={styles.chipNombre}>{u.nombre}</Text>
+                  <Text style={styles.chipNombre}>{firstNameOr(u.nombre)}</Text>
                   <TouchableOpacity onPress={() => toggleSeleccionado(u)}>
                     <Ionicons name="close" size={14} color="rgba(255,255,255,0.5)" />
                   </TouchableOpacity>
