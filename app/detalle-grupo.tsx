@@ -301,9 +301,18 @@ export default function DetalleGrupoScreen() {
     setPermisoDenegado: setConfigFotoPermisoDenegado,
   } = useImagePicker(handleConfigFotoElegida);
 
+  const abrirConfigFotoOpciones = () => {
+    setConfigVisible(false);
+    setTimeout(() => setConfigFotoSourceModalVisible(true), 350);
+  };
+
+  const cerrarConfigFotoOpciones = () => {
+    setConfigFotoSourceModalVisible(false);
+    setTimeout(() => setConfigVisible(true), 350);
+  };
+
   const pedirConfigFotoDesdeConfig = (origen: 'camara' | 'galeria') => {
     setConfigFotoPickerEnCurso(true);
-    setConfigVisible(false);
     pedirConfigFoto(origen);
   };
 
@@ -1282,7 +1291,7 @@ export default function DetalleGrupoScreen() {
                       <View style={styles.configFotoActions}>
                         <TouchableOpacity
                           style={styles.configFotoAction}
-                          onPress={() => setConfigFotoSourceModalVisible(true)}
+                          onPress={abrirConfigFotoOpciones}
                           disabled={configFotoPickerActivo}
                         >
                           <Text style={styles.configFotoActionText}>{configFotoUrl ? 'Cambiar' : 'Agregar foto'}</Text>
@@ -1472,7 +1481,7 @@ export default function DetalleGrupoScreen() {
           visible={configFotoSourceModalVisible}
           title="Foto del grupo"
           disabled={configFotoPickerActivo}
-          onClose={() => setConfigFotoSourceModalVisible(false)}
+          onClose={cerrarConfigFotoOpciones}
           onPick={pedirConfigFotoDesdeConfig}
         />
 
