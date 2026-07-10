@@ -283,6 +283,7 @@ export default function DetalleGrupoScreen() {
   const [configFotoUrl, setConfigFotoUrl] = useState<string | null>(null);
   const [configFotoPath, setConfigFotoPath] = useState<string | null>(null);
   const [configFotoQuitada, setConfigFotoQuitada] = useState(false);
+  const [configFotoPickerEnCurso, setConfigFotoPickerEnCurso] = useState(false);
 
   const handleConfigFotoElegida = useCallback((imagen: ImagenElegida) => {
     setConfigFoto(imagen);
@@ -299,6 +300,21 @@ export default function DetalleGrupoScreen() {
     permisoDenegado: configFotoPermisoDenegado,
     setPermisoDenegado: setConfigFotoPermisoDenegado,
   } = useImagePicker(handleConfigFotoElegida);
+
+  const pedirConfigFotoDesdeConfig = (origen: 'camara' | 'galeria') => {
+    setConfigFotoPickerEnCurso(true);
+    setConfigVisible(false);
+    pedirConfigFoto(origen);
+  };
+
+  useEffect(() => {
+    if (!configFotoPickerEnCurso || configFotoSourceModalVisible || configFotoPickerActivo) return;
+    const timer = setTimeout(() => {
+      setConfigVisible(true);
+      setConfigFotoPickerEnCurso(false);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [configFotoPickerEnCurso, configFotoPickerActivo, configFotoSourceModalVisible]);
 
   // En Android guarda el archivo en la carpeta que elija el usuario (descarga real).
   // En iOS abre la hoja de compartir, cuyo "Guardar en Archivos" es la descarga nativa.
@@ -1457,7 +1473,7 @@ export default function DetalleGrupoScreen() {
           title="Foto del grupo"
           disabled={configFotoPickerActivo}
           onClose={() => setConfigFotoSourceModalVisible(false)}
-          onPick={pedirConfigFoto}
+          onPick={pedirConfigFotoDesdeConfig}
         />
 
         <Modal transparent animationType="fade" visible={exportModalVisible} onRequestClose={() => setExportModalVisible(false)}>
