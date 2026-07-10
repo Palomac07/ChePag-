@@ -182,6 +182,7 @@ export default function DetalleGrupoScreen() {
   const [pagosPendientesLocal, setPagosPendientesLocal] = useState<{ de: string; a: string }[]>([]);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
+  const [gastoDetalle, setGastoDetalle] = useState<Gasto | null>(null);
   const [gastoAEliminar, setGastoAEliminar] = useState<Gasto | null>(null);
   const [eliminandoGasto, setEliminandoGasto] = useState(false);
   const [miembroAEliminar, setMiembroAEliminar] = useState<MiembroRef | null>(null);
@@ -940,7 +941,7 @@ export default function DetalleGrupoScreen() {
               const montoMostrado = (g.monto * monedaOrigen.tasaARS) / monedaDestino.tasaARS;
               return (
                 <View key={g.id} style={styles.card}>
-                  <View style={styles.cardRow}>
+                  <TouchableOpacity style={styles.cardRow} activeOpacity={0.82} onPress={() => setGastoDetalle(g)}>
                     <View style={styles.cardInfo}>
                       <Text style={styles.cardTitulo}>{g.nombre}</Text>
                       <Text style={styles.cardSub}>{g.pagador} pagó</Text>
@@ -951,10 +952,10 @@ export default function DetalleGrupoScreen() {
                         ))}
                       </View>
                       {g.fotoPath && (
-                        <TouchableOpacity style={styles.ticketLink} onPress={() => abrirTicket(g.fotoPath!)}>
+                        <View style={styles.ticketLink}>
                           <Ionicons name="receipt-outline" size={14} color="#4A9EFF" />
-                          <Text style={styles.ticketLinkText}>Ver comprobante</Text>
-                        </TouchableOpacity>
+                          <Text style={styles.ticketLinkText}>Con comprobante</Text>
+                        </View>
                       )}
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
@@ -967,7 +968,7 @@ export default function DetalleGrupoScreen() {
                         </View>
                       )}
                     </View>
-                  </View>
+                  </TouchableOpacity>
                   {puedeModificarGasto(g) && (
                     <View style={styles.gastoAcciones}>
                       <TouchableOpacity style={styles.gastoAccionBtn} onPress={() => handleEditarGasto(g)}>
@@ -1625,6 +1626,76 @@ export default function DetalleGrupoScreen() {
           onClose={handleEliminarMiembro}
         />
 
+        <Modal transparent animationType="fade" visible={!!gastoDetalle} onRequestClose={() => setGastoDetalle(null)}>
+          <View style={styles.overlayModal}>
+            {gastoDetalle && (() => {
+              const monedaOrigen = monedasMap[gastoDetalle.moneda] ?? { simbolo: '$', tasaARS: 1 };
+              const montoARS = gastoDetalle.monto * monedaOrigen.tasaARS;
+              const parteARS = gastoDetalle.participantes.length ? montoARS / gastoDetalle.participantes.length : 0;
+              return (
+                <View style={styles.gastoDetalleModal}>
+                  <View style={styles.gastoDetalleHeader}>
+                    <View style={styles.gastoDetalleIcon}>
+                      <Ionicons name="receipt-outline" size={24} color="#FFFFFF" />
+                    </View>
+                    <TouchableOpacity style={styles.gastoDetalleCerrar} onPress={() => setGastoDetalle(null)}>
+                      <Ionicons name="close" size={22} color="rgba(255,255,255,0.75)" />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.gastoDetalleTitulo}>{gastoDetalle.nombre}</Text>
+                  <Text style={styles.gastoDetalleMonto}>
+                    {monedaOrigen.simbolo} {gastoDetalle.monto.toLocaleString('es-AR', { maximumFractionDigits: 2 })} {gastoDetalle.moneda}
+                  </Text>
+                  {gastoDetalle.moneda !== 'ARS' && (
+                    <Text style={styles.gastoDetalleSubMonto}>Equivale a ${Math.round(montoARS).toLocaleString('es-AR')} ARS</Text>
+                  )}
+
+                  <View style={styles.gastoDetalleGrid}>
+                    <View style={styles.gastoDetalleItem}>
+                      <Text style={styles.gastoDetalleLabel}>Lo pago</Text>
+                      <Text style={styles.gastoDetalleValor}>{gastoDetalle.pagador}</Text>
+                    </View>
+                    <View style={styles.gastoDetalleItem}>
+                      <Text style={styles.gastoDetalleLabel}>Fecha</Text>
+                      <Text style={styles.gastoDetalleValor}>{gastoDetalle.fecha}</Text>
+                    </View>
+                    <View style={styles.gastoDetalleItem}>
+                      <Text style={styles.gastoDetalleLabel}>Categoria</Text>
+                      <Text style={styles.gastoDetalleValor}>{gastoDetalle.categoria || 'Sin categoria'}</Text>
+                    </View>
+                    <View style={styles.gastoDetalleItem}>
+                      <Text style={styles.gastoDetalleLabel}>Parte por persona</Text>
+                      <Text style={styles.gastoDetalleValor}>${Math.round(parteARS).toLocaleString('es-AR')} ARS</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.gastoDetalleSeccion}>Participantes</Text>
+                  <View style={styles.gastoDetalleParticipantes}>
+                    {gastoDetalle.participantes.map(p => (
+                      <View key={p} style={styles.chip}><Text style={styles.chipText}>{p}</Text></View>
+                    ))}
+                  </View>
+
+                  {gastoDetalle.fotoPath ? (
+                    <TouchableOpacity
+                      style={styles.gastoDetalleComprobanteBtn}
+                      onPress={() => abrirTicket(gastoDetalle.fotoPath!)}
+                    >
+                      <Ionicons name="image-outline" size={18} color="#FFFFFF" />
+                      <Text style={styles.gastoDetalleComprobanteText}>Ver comprobante</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={styles.gastoDetalleSinComprobante}>
+                      <Ionicons name="document-outline" size={18} color="rgba(255,255,255,0.45)" />
+                      <Text style={styles.gastoDetalleSinComprobanteText}>Este gasto no tiene comprobante cargado.</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })()}
+          </View>
+        </Modal>
+
         <Modal transparent animationType="fade" visible={ticketVisible} onRequestClose={() => setTicketVisible(false)}>
           <View style={styles.ticketModalOverlay}>
             <TouchableOpacity style={styles.ticketCerrar} onPress={() => setTicketVisible(false)}>
@@ -1686,6 +1757,27 @@ const styles = StyleSheet.create({
   gastoAcciones: { flexDirection: 'row', justifyContent: 'flex-end', gap: 18, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)' },
   gastoAccionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   gastoAccionText: { fontSize: 13, color: '#4A9EFF', fontWeight: '600' },
+  gastoDetalleModal: {
+    width: '90%', maxWidth: 430, maxHeight: '86%',
+    backgroundColor: 'rgba(8,18,40,0.98)', borderRadius: 26,
+    padding: 22, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+  },
+  gastoDetalleHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  gastoDetalleIcon: { width: 46, height: 46, borderRadius: 16, backgroundColor: '#4A9EFF', alignItems: 'center', justifyContent: 'center' },
+  gastoDetalleCerrar: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+  gastoDetalleTitulo: { fontSize: 22, color: '#FFFFFF', fontWeight: '800', marginBottom: 6 },
+  gastoDetalleMonto: { fontSize: 24, color: '#FFFFFF', fontWeight: '800' },
+  gastoDetalleSubMonto: { fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 4 },
+  gastoDetalleGrid: { marginTop: 18, gap: 10 },
+  gastoDetalleItem: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  gastoDetalleLabel: { fontSize: 11, color: 'rgba(255,255,255,0.42)', textTransform: 'uppercase', fontWeight: '700', marginBottom: 4 },
+  gastoDetalleValor: { fontSize: 14, color: '#FFFFFF', fontWeight: '600' },
+  gastoDetalleSeccion: { fontSize: 12, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', fontWeight: '700', marginTop: 18, marginBottom: 10 },
+  gastoDetalleParticipantes: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  gastoDetalleComprobanteBtn: { marginTop: 20, backgroundColor: '#4A9EFF', borderRadius: 18, paddingVertical: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
+  gastoDetalleComprobanteText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+  gastoDetalleSinComprobante: { marginTop: 20, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  gastoDetalleSinComprobanteText: { flex: 1, color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: '600' },
   expulsarBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 50, borderWidth: 1, borderColor: 'rgba(255,107,107,0.4)', backgroundColor: 'rgba(255,107,107,0.12)' },
   expulsarText: { fontSize: 13, color: '#FF6B6B', fontWeight: '600' },
   ticketModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center', padding: 16 },
