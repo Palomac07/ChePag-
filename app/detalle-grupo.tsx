@@ -188,6 +188,13 @@ export default function DetalleGrupoScreen() {
   const [miembroAEliminar, setMiembroAEliminar] = useState<MiembroRef | null>(null);
   const [eliminandoMiembro, setEliminandoMiembro] = useState(false);
 
+  const abrirTicketDesdeDetalle = (path: string) => {
+    setGastoDetalle(null);
+    setTimeout(() => {
+      abrirTicket(path);
+    }, 350);
+  };
+
   const cargarDatos = useCallback(async (esRefresh = false) => {
     if (!id) return;
     if (esRefresh) setRefrescando(true); else setCargando(true);
@@ -1679,7 +1686,7 @@ export default function DetalleGrupoScreen() {
                   {gastoDetalle.fotoPath ? (
                     <TouchableOpacity
                       style={styles.gastoDetalleComprobanteBtn}
-                      onPress={() => abrirTicket(gastoDetalle.fotoPath!)}
+                      onPress={() => abrirTicketDesdeDetalle(gastoDetalle.fotoPath!)}
                     >
                       <Ionicons name="image-outline" size={18} color="#FFFFFF" />
                       <Text style={styles.gastoDetalleComprobanteText}>Ver comprobante</Text>
