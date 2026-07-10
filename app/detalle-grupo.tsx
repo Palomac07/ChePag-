@@ -18,10 +18,12 @@ import * as Print from 'expo-print';
 import { supabase } from '@/lib/supabase';
 import { needsRatesFetch, fetchRatesMap } from '@/lib/ratesCache';
 import { useAmistadStore } from '@/store/useAmistadStore';
-import { getSignedUrl, deleteTicket } from '@/lib/ticketImage';
+import { getSignedUrl, deleteTicket, uploadTicket, type ImagenElegida } from '@/lib/ticketImage';
 import ZoomableImage from '@/components/ZoomableImage';
 import InvitarSheet from '@/components/InvitarSheet';
 import { CHEPAGA_LOGO_DATA_URI } from '@/constants/logoBase64';
+import ImageSourceModal from '@/components/ImageSourceModal';
+import { useImagePicker } from '@/hooks/useImagePicker';
 
 const BG = require('@/assets/images/bg.png');
 
@@ -277,6 +279,26 @@ export default function DetalleGrupoScreen() {
   const [tasasModo, setTasasModo] = useState<Record<string, 'auto' | 'manual'>>({});
   const [monedaHistorial, setMonedaHistorial] = useState('ARS');
   const [exportModalVisible, setExportModalVisible] = useState(false);
+  const [configFoto, setConfigFoto] = useState<ImagenElegida | null>(null);
+  const [configFotoUrl, setConfigFotoUrl] = useState<string | null>(null);
+  const [configFotoPath, setConfigFotoPath] = useState<string | null>(null);
+  const [configFotoQuitada, setConfigFotoQuitada] = useState(false);
+
+  const handleConfigFotoElegida = useCallback((imagen: ImagenElegida) => {
+    setConfigFoto(imagen);
+    setConfigFotoUrl(imagen.uri);
+    setConfigFotoQuitada(false);
+    setErrorConfig('');
+  }, []);
+
+  const {
+    sourceModalVisible: configFotoSourceModalVisible,
+    setSourceModalVisible: setConfigFotoSourceModalVisible,
+    pedirImagen: pedirConfigFoto,
+    pickerActivo: configFotoPickerActivo,
+    permisoDenegado: configFotoPermisoDenegado,
+    setPermisoDenegado: setConfigFotoPermisoDenegado,
+  } = useImagePicker(handleConfigFotoElegida);
 
   // En Android guarda el archivo en la carpeta que elija el usuario (descarga real).
   // En iOS abre la hoja de compartir, cuyo "Guardar en Archivos" es la descarga nativa.
@@ -431,6 +453,10 @@ export default function DetalleGrupoScreen() {
     setTasasInput(inputs);
     setTasasModo(modos);
     setRankingEditando(rankingActivo);
+    setConfigFoto(null);
+    setConfigFotoPath(grupo?.fotoPath ?? null);
+    setConfigFotoUrl(grupo?.fotoUrl ?? null);
+    setConfigFotoQuitada(false);
     setAgregarMonedaOpen(false);
     setErrorConfig('');
     setMenuVisible(false);
@@ -467,7 +493,14 @@ export default function DetalleGrupoScreen() {
     setMonedasEditando(prev => prev.filter(m => m.codigo !== codigo));
   };
 
-  const guardarConfig = () => {
+  const quitarConfigFoto = () => {
+    setConfigFoto(null);
+    setConfigFotoUrl(null);
+    setConfigFotoQuitada(true);
+    setErrorConfig('');
+  };
+
+  const guardarConfig = async () => {
     for (const m of monedasEditando) {
       if (m.codigo !== 'ARS' && tasasModo[m.codigo] === 'manual') {
         const tasa = Number(tasasInput[m.codigo]);
@@ -477,14 +510,34 @@ export default function DetalleGrupoScreen() {
         }
       }
     }
+    if (configFoto && (!id || !userId)) {
+      setErrorConfig('No se pudo guardar la foto del grupo. Volve a iniciar sesion e intentalo de nuevo.');
+      return;
+    }
     const guardadas = monedasEditando.map(m => ({
       ...m,
       tasaARS: m.codigo === 'ARS' ? 1 : Number(tasasInput[m.codigo]),
       tasaAuto: m.codigo !== 'ARS' ? tasasModo[m.codigo] !== 'manual' : undefined,
     }));
+    let fotoPathFinal = configFotoQuitada ? null : configFotoPath;
+    if (configFoto && id && userId) {
+      const subida = await uploadTicket(userId, id, configFoto.base64);
+      if (!subida) {
+        setErrorConfig('No se pudo subir la foto del grupo. Intentalo de nuevo.');
+        return;
+      }
+      fotoPathFinal = subida;
+    }
+    const guardadasConFoto = guardadas.map((m, index) => {
+      const { fotoPath: _fotoPath, ...monedaSinFoto } = m;
+      return index === 0 && fotoPathFinal ? { ...monedaSinFoto, fotoPath: fotoPathFinal } : monedaSinFoto;
+    });
     if (id) {
-      actualizarMonedas(id, guardadas);
+      await actualizarMonedas(id, guardadasConFoto);
       actualizarRanking(id, rankingEditando);
+    }
+    if (configFotoPath && configFotoPath !== fotoPathFinal) {
+      deleteTicket(configFotoPath);
     }
     if (!rankingEditando && tabActivo === 'Ranking') {
       setTabActivo(TABS[balanceIndex]);
@@ -1190,6 +1243,44 @@ export default function DetalleGrupoScreen() {
               </View>
 
               <ScrollView showsVerticalScrollIndicator={false} keyboardDismissMode="on-drag" onScrollBeginDrag={Keyboard.dismiss} keyboardShouldPersistTaps="handled">
+                <Text style={styles.configSeccionTitulo}>Foto del grupo</Text>
+                {!esAdmin && (
+                  <Text style={styles.configNota}>Solo los administradores pueden cambiar la foto.</Text>
+                )}
+                <View style={styles.configFotoCard}>
+                  {configFotoUrl ? (
+                    <Image source={{ uri: configFotoUrl }} style={styles.configFotoPreview} contentFit="cover" />
+                  ) : (
+                    <View style={styles.configFotoPlaceholder}>
+                      <Ionicons name="people-outline" size={28} color="rgba(255,255,255,0.55)" />
+                    </View>
+                  )}
+                  <View style={styles.configFotoInfo}>
+                    <Text style={styles.configFotoTitulo}>
+                      {configFotoUrl ? 'Foto seleccionada' : 'Sin foto personalizada'}
+                    </Text>
+                    <Text style={styles.configFotoDesc}>
+                      Esta imagen aparece en Grupos, Mis grupos y el detalle del grupo.
+                    </Text>
+                    {esAdmin && (
+                      <View style={styles.configFotoActions}>
+                        <TouchableOpacity
+                          style={styles.configFotoAction}
+                          onPress={() => setConfigFotoSourceModalVisible(true)}
+                          disabled={configFotoPickerActivo}
+                        >
+                          <Text style={styles.configFotoActionText}>{configFotoUrl ? 'Cambiar' : 'Agregar foto'}</Text>
+                        </TouchableOpacity>
+                        {configFotoUrl && (
+                          <TouchableOpacity style={styles.configFotoRemove} onPress={quitarConfigFoto}>
+                            <Text style={styles.configFotoRemoveText}>Quitar</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                </View>
+
                 <Text style={styles.configSeccionTitulo}>Monedas del grupo</Text>
                 {!esAdmin && (
                   <Text style={styles.configNota}>Solo los administradores pueden editar monedas.</Text>
@@ -1361,6 +1452,14 @@ export default function DetalleGrupoScreen() {
           </View>
         </Modal>
 
+        <ImageSourceModal
+          visible={configFotoSourceModalVisible}
+          title="Foto del grupo"
+          disabled={configFotoPickerActivo}
+          onClose={() => setConfigFotoSourceModalVisible(false)}
+          onPick={pedirConfigFoto}
+        />
+
         <Modal transparent animationType="fade" visible={exportModalVisible} onRequestClose={() => setExportModalVisible(false)}>
           <View style={styles.overlayModal}>
             <View style={styles.popupModal}>
@@ -1384,6 +1483,14 @@ export default function DetalleGrupoScreen() {
             </View>
           </View>
         </Modal>
+
+        <ConfirmPopup
+          visible={configFotoPermisoDenegado}
+          emoji="🔒"
+          titulo="Permiso necesario"
+          mensaje="Necesitamos permiso para acceder a la camara o galeria."
+          onClose={() => setConfigFotoPermisoDenegado(false)}
+        />
 
         <ConfirmPopup
           visible={popup.visible}
@@ -1711,6 +1818,24 @@ const styles = StyleSheet.create({
   configCerrar: { fontSize: 18, color: 'rgba(255,255,255,0.5)', padding: 4 },
   configSeccionTitulo: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.45)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
   configNota: { fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 12, fontStyle: 'italic' },
+  configFotoCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14,
+    padding: 12, marginBottom: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  configFotoPreview: { width: 76, height: 76, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.08)' },
+  configFotoPlaceholder: {
+    width: 76, height: 76, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(74,158,255,0.14)', borderWidth: 1, borderColor: 'rgba(74,158,255,0.22)',
+  },
+  configFotoInfo: { flex: 1, minWidth: 0 },
+  configFotoTitulo: { fontSize: 14, color: '#FFFFFF', fontWeight: '700', marginBottom: 3 },
+  configFotoDesc: { fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 16 },
+  configFotoActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' },
+  configFotoAction: { backgroundColor: '#4A9EFF', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8 },
+  configFotoActionText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+  configFotoRemove: { borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: 'rgba(255,77,77,0.12)', borderWidth: 1, borderColor: 'rgba(255,77,77,0.25)' },
+  configFotoRemoveText: { color: '#FF6B6B', fontSize: 12, fontWeight: '700' },
   configMonedaCard: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   configMonedaCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 10 },
   configMonedaBadge: { backgroundColor: '#4A9EFF', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },

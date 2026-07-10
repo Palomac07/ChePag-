@@ -231,7 +231,9 @@ export const useGruposStore = create<GruposStore>((set, get) => ({
 
   actualizarMonedas: async (id, monedas) => {
     await supabase.from('grupos').update({ monedas }).eq('id', id);
-    set(state => ({ grupos: state.grupos.map(g => g.id === id ? { ...g, monedas } : g) }));
+    const fotoPath = monedas.find(m => m.fotoPath)?.fotoPath ?? null;
+    const fotoUrl = fotoPath ? await getSignedUrl(fotoPath) : null;
+    set(state => ({ grupos: state.grupos.map(g => g.id === id ? { ...g, monedas, fotoPath, fotoUrl } : g) }));
   },
 
   hacerAdmin: async (grupoId, userId) => {
