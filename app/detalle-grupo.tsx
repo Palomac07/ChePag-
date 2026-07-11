@@ -24,6 +24,7 @@ import { CHEPAGA_LOGO_DATA_URI } from '@/constants/logoBase64';
 import ImageSourceModal from '@/components/ImageSourceModal';
 import { useImagePicker } from '@/hooks/useImagePicker';
 import { firstName, firstNameOr } from '@/lib/displayName';
+import { calcularBalanceGrupo, calcularTransferenciasMinimas } from '@/lib/balances';
 
 const BG = require('@/assets/images/bg.png');
 
@@ -51,71 +52,11 @@ function formatearFecha(iso: string): string {
   return `${d.getDate()} ${meses[d.getMonth()]}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-type MiembroRef = { user_id: string; nombre: string };
+type MiembroRef = { user_id: string; nombre: string; es_admin?: boolean; color?: string };
 
 const MIEMBROS_VACIOS: MiembroRef[] = [];
 const ADMINISTRADORES_VACIOS: string[] = [];
 const MONEDAS_DEFAULT: Moneda[] = [{ codigo: 'ARS', nombre: 'Peso argentino', simbolo: '$', tasaARS: 1 }];
-
-// Saldos por identidad estable (user_id) para que un cambio de nombre no parta a
-// una persona en dos. Se devuelve igual { nombre, monto } con el nombre canónico
-// del miembro, así el resto de la pantalla (que matchea por nombre) no cambia.
-function calcularBalance(gastos: Gasto[], monedas: Moneda[], pagos: { de: string; a: string; monto: number }[] = [], miembros: MiembroRef[] = []) {
-  const monedasMap: Record<string, Moneda> = {};
-  for (const m of monedas) monedasMap[m.codigo] = m;
-
-  const nombreToId: Record<string, string> = {};
-  const idToNombre: Record<string, string> = {};
-  for (const m of miembros) { if (m.nombre) nombreToId[m.nombre] = m.user_id; if (m.user_id) idToNombre[m.user_id] = m.nombre; }
-  for (const g of gastos) {
-    if (g.pagador_id && g.pagador && !idToNombre[g.pagador_id]) idToNombre[g.pagador_id] = g.pagador;
-    if (g.pagador && !nombreToId[g.pagador]) nombreToId[g.pagador] = g.pagador_id || '';
-    for (const p of g.participantesData ?? []) {
-      if (p.id && p.nombre && !idToNombre[p.id]) idToNombre[p.id] = p.nombre;
-      if (p.nombre && !nombreToId[p.nombre]) nombreToId[p.nombre] = p.id || '';
-    }
-  }
-  const idDe = (nombre?: string, id?: string) =>
-    (id && id.length ? id : (nombre ? (nombreToId[nombre] || `n:${nombre}`) : 'desconocido'));
-  const nombreDe = (id: string) => idToNombre[id] || (id.startsWith('n:') ? id.slice(2) : id);
-
-  const saldos: Record<string, number> = {};
-  for (const g of gastos) {
-    const tasa = monedasMap[g.moneda]?.tasaARS ?? 1;
-    const montoARS = g.monto * tasa;
-    const partIds = (g.participantesData?.length ? g.participantesData.map(p => idDe(p.nombre, p.id)) : g.participantes.map(n => idDe(n)));
-    const parte = partIds.length ? montoARS / partIds.length : 0;
-    const payerId = idDe(g.pagador, g.pagador_id);
-    saldos[payerId] = (saldos[payerId] ?? 0) + montoARS;
-    for (const pid of partIds) saldos[pid] = (saldos[pid] ?? 0) - parte;
-  }
-  for (const p of pagos) {
-    const deId = idDe(p.de);
-    const aId = idDe(p.a);
-    saldos[deId] = (saldos[deId] ?? 0) + p.monto;
-    saldos[aId] = (saldos[aId] ?? 0) - p.monto;
-  }
-  return Object.entries(saldos).map(([id, monto]) => ({ nombre: nombreDe(id), monto: Math.round(monto) }));
-}
-
-function calcularDeudas(gastos: Gasto[], monedas: Moneda[], pagos: { de: string; a: string; monto: number }[] = [], miembros: MiembroRef[] = []) {
-  const saldos = calcularBalance(gastos, monedas, pagos, miembros);
-  const deudores = saldos.filter(s => s.monto < 0).sort((a, b) => a.monto - b.monto);
-  const acreedores = saldos.filter(s => s.monto > 0).sort((a, b) => b.monto - a.monto);
-  const deudas: { de: string; a: string; monto: number }[] = [];
-  const d = deudores.map(x => ({ ...x }));
-  const a = acreedores.map(x => ({ ...x }));
-  let i = 0, j = 0;
-  while (i < d.length && j < a.length) {
-    const pago = Math.min(-d[i].monto, a[j].monto);
-    deudas.push({ de: d[i].nombre, a: a[j].nombre, monto: Math.round(pago) });
-    d[i].monto += pago;
-    a[j].monto -= pago;
-    if (Math.abs(d[i].monto) < 1) i++;
-    if (Math.abs(a[j].monto) < 1) j++;
-  }
-  return deudas;
-}
 
 const titulos = [
   'El que siempre invita',
@@ -384,8 +325,8 @@ export default function DetalleGrupoScreen() {
     }
     try {
       const gastosGrupo = gastos;
-      const balancePDF = calcularBalance(gastosGrupo, monedas, [], miembrosGrupo);
-      const deudasPDF = calcularDeudas(gastosGrupo, monedas, [], miembrosGrupo);
+      const balancePDF = calcularBalanceGrupo(gastosGrupo, monedas, [], miembrosGrupo);
+      const deudasPDF = calcularTransferenciasMinimas(gastosGrupo, monedas, [], miembrosGrupo);
       const totalARS = gastosGrupo.reduce((acc, g) => acc + g.monto * (monedasMap[g.moneda]?.tasaARS ?? 1), 0);
       const filasGastos = gastosGrupo.map(g => `<tr><td>${g.nombre}</td><td>${firstNameOr(g.pagador)}</td><td>${g.fecha}</td><td class="amount">${g.moneda !== 'ARS' ? `${g.moneda} ${g.monto.toLocaleString('es-AR')}` : `$${g.monto.toLocaleString('es-AR')}`}</td><td>${g.participantes.map(p => firstNameOr(p)).join(', ')}</td></tr>`).join('');
       const filasBalance = balancePDF.map(b => `<tr><td>${firstNameOr(b.nombre)}</td><td style="text-align:right"><span class="pill ${b.monto >= 0 ? 'pos' : 'neg'}">${b.monto >= 0 ? '+' : '−'}$${Math.abs(b.monto).toLocaleString('es-AR')}</span></td></tr>`).join('');
@@ -525,8 +466,8 @@ export default function DetalleGrupoScreen() {
     mostrarPopup('✅', '¡Configuración guardada!', 'Los cambios fueron aplicados al grupo.');
   };
 
-  const balance = useMemo(() => calcularBalance(gastos, monedas, pagosDB, miembrosGrupo), [gastos, miembrosGrupo, monedas, pagosDB]);
-  const deudas = useMemo(() => calcularDeudas(gastos, monedas, pagosDB, miembrosGrupo), [gastos, miembrosGrupo, monedas, pagosDB]);
+  const balance = useMemo(() => calcularBalanceGrupo(gastos, monedas, pagosDB, miembrosGrupo), [gastos, miembrosGrupo, monedas, pagosDB]);
+  const deudas = useMemo(() => calcularTransferenciasMinimas(gastos, monedas, pagosDB, miembrosGrupo), [gastos, miembrosGrupo, monedas, pagosDB]);
   const rankingIndex = TABS.indexOf('Ranking');
   const balanceIndex = TABS.indexOf('Balance');
 

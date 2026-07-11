@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import { getSignedUrl } from '@/lib/ticketImage';
+import { calcularResumenPersonal } from '@/lib/balances';
 
 export type GrupoMiembro = {
   user_id: string;
@@ -121,61 +122,9 @@ export const useGruposStore = create<GruposStore>((set, get) => ({
         ? g.monedas
         : [{ codigo: 'ARS', nombre: 'Peso argentino', simbolo: '$', tasaARS: 1 }];
       const fotoPath = monedas.find(m => m.fotoPath)?.fotoPath ?? null;
-      const monedasMap: Record<string, number> = {};
-      for (const m of monedas) monedasMap[m.codigo] = m.tasaARS;
-
-      // Saldos por identidad estable (user_id). Antes se calculaba por nombre, pero
-      // el nombre no siempre coincide entre grupo_miembros, el pagador y los
-      // participantes (al editar el perfil no se actualiza grupo_miembros), y por eso
-      // "Debes" quedaba en 0. Colapsamos a user_id cuando existe; si no, al nombre.
-      const nombreToId: Record<string, string> = {};
-      for (const m of miembros) if (m?.nombre) nombreToId[m.nombre] = m.user_id;
-      const idDe = (nombre?: string | null, id?: string | null) =>
-        id || (nombre ? (nombreToId[nombre] ?? `nombre:${nombre}`) : 'desconocido');
-
       const gastos = gastosPorGrupo[g.id] ?? [];
-      const saldos: Record<string, number> = {}; // neto por persona, solo para detectar "saldado"
-      let totalARS = 0;
-      // Importes BRUTOS (no se compensan entre sí, igual que la Actividad Reciente):
-      //  - teDebenGross: lo que otros me deben en gastos que pagué yo
-      //  - debesGross:  mi parte en gastos que pagó otro
-      let teDebenGross = 0;
-      let debesGross = 0;
-
-      for (const gasto of gastos) {
-        const tasa = monedasMap[gasto.moneda] ?? 1;
-        const montoARS = gasto.monto * tasa;
-        totalARS += montoARS;
-        const participantes = (gasto.participantes as any[] ?? []);
-        const partIds = participantes.map((p: any) =>
-          typeof p === 'string' ? idDe(p) : idDe(p?.nombre, p?.user_id));
-        const parte = partIds.length > 0 ? montoARS / partIds.length : 0;
-        const payerId = idDe(gasto.pagador_nombre, gasto.pagador_id);
-
-        saldos[payerId] = (saldos[payerId] ?? 0) + montoARS;
-        for (const pid of partIds) saldos[pid] = (saldos[pid] ?? 0) - parte;
-
-        const yoParticipo = partIds.includes(userId);
-        if (payerId === userId) {
-          teDebenGross += montoARS - (yoParticipo ? parte : 0); // el resto me debe su parte
-        } else if (yoParticipo) {
-          debesGross += parte; // pagó otro y yo participo: debo mi parte
-        }
-      }
-
-      for (const pago of pagosPorGrupo[g.id] ?? []) {
-        const deId = idDe(pago.de_nombre);
-        const aId = idDe(pago.a_nombre);
-        saldos[deId] = (saldos[deId] ?? 0) + pago.monto;
-        saldos[aId] = (saldos[aId] ?? 0) - pago.monto;
-        if (deId === userId) debesGross -= pago.monto;   // salde una deuda
-        if (aId === userId) teDebenGross -= pago.monto;   // me pagaron lo que me debían
-      }
-
-      const teDebenNum = Math.max(0, Math.round(teDebenGross));
-      const debesNum = Math.max(0, Math.round(debesGross));
-
-      const saldado = gastos.length > 0 && Object.values(saldos).every(v => Math.abs(v) <= 1);
+      const resumen = calcularResumenPersonal(userId, gastos, monedas, pagosPorGrupo[g.id] ?? [], miembros);
+      const { totalARS, teDebenNum, debesNum, saldado } = resumen;
 
       return {
         id: g.id,
