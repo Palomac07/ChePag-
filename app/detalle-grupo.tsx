@@ -10,7 +10,6 @@ import ConfirmPopup from '@/components/ConfirmPopup';
 import { useGruposStore, Moneda } from '@/store/useGruposStore';
 import { useUserStore } from '@/store/useUserStore';
 import GraficoCircular from '@/components/GraficoCircular';
-import { File, Paths } from 'expo-file-system/next';
 import { StorageAccessFramework, readAsStringAsync, writeAsStringAsync } from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Sharing from 'expo-sharing';
@@ -50,15 +49,6 @@ function formatearFecha(iso: string): string {
   const d = new Date(iso);
   const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
   return `${d.getDate()} ${meses[d.getMonth()]}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-function escapeHtml(value: unknown): string {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }
 
 type MiembroRef = { user_id: string; nombre: string };
@@ -371,76 +361,6 @@ export default function DetalleGrupoScreen() {
     // puede descartar la presentación.
     if (Platform.OS === 'ios') await new Promise(r => setTimeout(r, 500));
     await Sharing.shareAsync(fileUri, { mimeType, dialogTitle: 'Guardar o compartir' });
-  };
-
-  const exportarExcel = async () => {
-    setExportModalVisible(false);
-    if (Platform.OS !== 'android' && !(await Sharing.isAvailableAsync())) {
-      mostrarPopup('ℹ️', 'No disponible', 'La exportación está disponible en la app móvil.');
-      return;
-    }
-    try {
-      const gastosGrupo = gastos;
-      const balanceExcel = calcularBalance(gastosGrupo, monedas, [], miembrosGrupo);
-      const deudasExcel = calcularDeudas(gastosGrupo, monedas, [], miembrosGrupo);
-      const totalARS = gastosGrupo.reduce((acc, g) => acc + g.monto * (monedasMap[g.moneda]?.tasaARS ?? 1), 0);
-      const fechaReporte = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
-      const totalFmt = `$${Math.round(totalARS).toLocaleString('es-AR')}`;
-      const cell = (value: unknown, type: 'String' | 'Number' = 'String') =>
-        `<Cell><Data ss:Type="${type}">${escapeHtml(value)}</Data></Cell>`;
-      const row = (values: (string | number)[], numeric: number[] = []) =>
-        `<Row>${values.map((v, i) => cell(v, numeric.includes(i) ? 'Number' : 'String')).join('')}</Row>`;
-      const sheet = (sheetName: string, rows: string[]) =>
-        `<Worksheet ss:Name="${escapeHtml(sheetName)}"><Table>${rows.join('')}</Table></Worksheet>`;
-      const resumenRows = [
-        row(['Reporte', nombre ?? 'Grupo']),
-        row(['Generado', fechaReporte]),
-        row(['Total ARS', Math.round(totalARS)], [1]),
-        row(['Total formateado', totalFmt]),
-        row(['Gastos', gastosGrupo.length], [1]),
-        row(['Personas', balanceExcel.length], [1]),
-      ];
-      const gastosRows = [
-        row(['Nombre', 'Pagador', 'Fecha', 'Moneda', 'Monto original', 'Monto ARS', 'Participantes']),
-        ...gastosGrupo.map(g => row([
-          g.nombre,
-          firstNameOr(g.pagador),
-          g.fecha,
-          g.moneda,
-          g.monto,
-          Math.round(g.monto * (monedasMap[g.moneda]?.tasaARS ?? 1)),
-          g.participantes.map(p => firstNameOr(p)).join(', '),
-        ], [4, 5])),
-      ];
-      const balanceRows = [
-        row(['Miembro', 'Balance ARS']),
-        ...balanceExcel.map(b => row([firstNameOr(b.nombre), Math.round(b.monto)], [1])),
-      ];
-      const deudasRows = deudasExcel.length
-        ? [
-          row(['De', 'A', 'Monto ARS']),
-          ...deudasExcel.map(d => row([firstNameOr(d.de), firstNameOr(d.a), Math.round(d.monto)], [2])),
-        ]
-        : [row(['Todo saldado', 'No hay deudas pendientes.'])];
-      const excelXml = `<?xml version="1.0" encoding="UTF-8"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:o="urn:schemas-microsoft-com:office:office"
- xmlns:x="urn:schemas-microsoft-com:office:excel"
- xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
- ${sheet('Resumen', resumenRows)}
- ${sheet('Gastos', gastosRows)}
- ${sheet('Balance', balanceRows)}
- ${sheet('A pagar', deudasRows)}
-</Workbook>`;
-      const fileName = `${nombre ?? 'grupo'}_reporte.xls`;
-      const file = new File(Paths.cache, fileName);
-      if (file.exists) file.delete();
-      file.create();
-      file.write(excelXml);
-      await guardarArchivo(file.uri, fileName, 'application/vnd.ms-excel', excelXml, 'utf8');
-    } catch (e) {
-      Alert.alert('Error Excel', String(e));
-    }
   };
 
   const exportarPDF = async () => {
@@ -1517,9 +1437,6 @@ export default function DetalleGrupoScreen() {
               <Text style={styles.popupModalTitulo}>Exportar gastos</Text>
               <Text style={styles.popupModalMensaje}>¿En qué formato querés exportar?</Text>
               <View style={{ width: '100%', gap: 10 }}>
-                <TouchableOpacity style={styles.exportOpcionBtn} onPress={exportarExcel}>
-                  <Text style={styles.exportOpcionText}>📊 Exportar como Excel</Text>
-                </TouchableOpacity>
                 <TouchableOpacity style={[styles.exportOpcionBtn, { backgroundColor: '#4A9EFF' }]} onPress={exportarPDF}>
                   <Text style={styles.exportOpcionText}>📄 Exportar como PDF</Text>
                 </TouchableOpacity>
