@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, ImageBackground } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import ConfirmPopup from '@/components/ConfirmPopup';
 import { esTelefonoValido, esFechaValida, formatearFechaInput } from '@/utils/validaciones';
@@ -15,6 +14,12 @@ const BG = require('@/assets/images/bg.png');
 export default function EditarPerfilScreen() {
   const router = useRouter();
   const cargarPerfil = useUserStore(s => s.cargarPerfil);
+  const storeNombre = useUserStore(s => s.nombre);
+  const storeUsername = useUserStore(s => s.username);
+  const storeTelefono = useUserStore(s => s.telefono);
+  const storeFechaNacimiento = useUserStore(s => s.fechaNacimiento);
+  const storeGenero = useUserStore(s => s.genero);
+  const storeEmail = useUserStore(s => s.email);
 
   const [nombre, setNombre] = useState('');
   const [username, setUsername] = useState('');
@@ -30,25 +35,59 @@ export default function EditarPerfilScreen() {
   const [desvinculando, setDesvinculando] = useState(false);
   const [popupDesvincular, setPopupDesvincular] = useState(false);
 
+  const aplicarDatosGuardados = useCallback((datos: {
+    nombre?: string | null;
+    username?: string | null;
+    telefono?: string | null;
+    fecha_nacimiento?: string | null;
+    genero?: 'masculino' | 'femenino' | 'otro' | null;
+    email?: string | null;
+  }) => {
+    setNombre(datos.nombre ?? '');
+    setUsername(datos.username ?? '');
+    setNumero(datos.telefono ?? '');
+    setFecha(datos.fecha_nacimiento ?? '');
+    setGenero(datos.genero ?? null);
+    if (datos.email) setMail(datos.email);
+  }, []);
+
+  useEffect(() => {
+    aplicarDatosGuardados({
+      nombre: storeNombre,
+      username: storeUsername,
+      telefono: storeTelefono,
+      fecha_nacimiento: storeFechaNacimiento,
+      genero: storeGenero,
+      email: storeEmail,
+    });
+  }, [aplicarDatosGuardados, storeEmail, storeFechaNacimiento, storeGenero, storeNombre, storeTelefono, storeUsername]);
+
   const cargarDatos = useCallback(async () => {
+    setCargandoPerfil(true);
+    aplicarDatosGuardados({
+      nombre: storeNombre,
+      username: storeUsername,
+      telefono: storeTelefono,
+      fecha_nacimiento: storeFechaNacimiento,
+      genero: storeGenero,
+      email: storeEmail,
+    });
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setCargandoPerfil(false); return; }
     if (user.email) setMail(user.email);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .select('nombre, username, telefono, fecha_nacimiento, genero, mp_user_id')
       .eq('id', user.id)
       .maybeSingle();
-    if (data) {
-      if (data.nombre) setNombre(data.nombre);
-      if (data.username) setUsername(data.username);
-      if (data.telefono) setNumero(data.telefono);
-      if (data.fecha_nacimiento) setFecha(data.fecha_nacimiento);
-      if (data.genero) setGenero(data.genero);
+
+    if (!error && data) {
+      aplicarDatosGuardados({ ...data, email: user.email });
       setMpVinculado(!!data.mp_user_id);
     }
     setCargandoPerfil(false);
-  }, []);
+  }, [aplicarDatosGuardados, storeEmail, storeFechaNacimiento, storeGenero, storeNombre, storeTelefono, storeUsername]);
 
   useFocusEffect(useCallback(() => { cargarDatos(); }, [cargarDatos]));
 

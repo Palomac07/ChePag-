@@ -948,7 +948,9 @@ export default function DetalleGrupoScreen() {
                         b.monto > 0 ? styles.barPositivo : styles.barNegativo
                       ]} />
                     </View>
-                    <Text style={styles.barLabel}>{firstNameOr(b.nombre)}</Text>
+                    <Text style={styles.barLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>
+                      {firstNameOr(b.nombre)}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -956,7 +958,9 @@ export default function DetalleGrupoScreen() {
                 <Text style={styles.porPersonaTitulo}>Por Persona</Text>
                 {balance.map((b) => (
                   <View key={b.nombre} style={styles.porPersonaRow}>
-                    <Text style={styles.porPersonaNombre}>{firstNameOr(b.nombre)}</Text>
+                    <Text style={styles.porPersonaNombre} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.78}>
+                      {firstNameOr(b.nombre)}
+                    </Text>
                     <View style={styles.porPersonaBarBg}>
                       <View style={[
                         styles.porPersonaBarFill,
@@ -1767,14 +1771,14 @@ const styles = StyleSheet.create({
   bar: { width: 18, borderRadius: 4 },
   barPositivo: { backgroundColor: '#34D399' },
   barNegativo: { backgroundColor: '#FF4D4D' },
-  barLabel: { fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 4 },
+  barLabel: { fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 4, width: 58, textAlign: 'center' },
   porPersonaContainer: { marginTop: 8 },
   porPersonaTitulo: { fontSize: 15, fontWeight: '700', color: '#FFFFFF', marginBottom: 12 },
   porPersonaRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  porPersonaNombre: { fontSize: 13, color: 'rgba(255,255,255,0.8)', width: 44 },
+  porPersonaNombre: { fontSize: 13, color: 'rgba(255,255,255,0.8)', width: 78, flexShrink: 0 },
   porPersonaBarBg: { flex: 1, height: 10, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 5, marginHorizontal: 8, overflow: 'hidden' },
   porPersonaBarFill: { height: '100%', borderRadius: 5 },
-  porPersonaMonto: { fontSize: 12, fontWeight: '600', width: 72, textAlign: 'right' },
+  porPersonaMonto: { fontSize: 12, fontWeight: '600', width: 82, textAlign: 'right' },
   montoPos: { color: '#34D399' },
   montoNeg: { color: '#FF4D4D' },
   destacadosGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 },
