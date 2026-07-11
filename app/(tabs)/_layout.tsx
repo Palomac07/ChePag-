@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import PagerView from '@/components/PagerViewCompat';
 import { useRouter } from 'expo-router';
@@ -46,6 +46,7 @@ export default function TabLayout() {
 
 function TabsContent() {
   const router = useRouter();
+  const { width: screenWidth } = useWindowDimensions();
   const pagerRef = useRef<PagerView>(null);
   const [activeIdx, setActiveIdx] = useState(0);
   const [accionesVisible, setAccionesVisible] = useState(false);
@@ -115,10 +116,13 @@ function TabsContent() {
         ref={pagerRef}
         style={styles.pager}
         initialPage={0}
+        overdrag={false}
+        pageMargin={0}
+        offscreenPageLimit={1}
         onPageSelected={e => setActiveIdx(e.nativeEvent.position)}
       >
         {PAGES.map((page) => (
-          <View key={page.key} style={styles.page}>
+          <View key={page.key} collapsable={false} style={[styles.page, { width: screenWidth }]}>
             <page.component />
           </View>
         ))}
