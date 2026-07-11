@@ -254,9 +254,7 @@ export default function DetalleGrupoScreen() {
   const backTranslateX = useRef(new Animated.Value(0)).current;
   const backPanResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (evt, g) =>
-      evt.nativeEvent.pageX <= 24 && g.dx > 18 && Math.abs(g.dx) > Math.abs(g.dy) * 2.2,
-    onPanResponderTerminationRequest: () => true,
+    onMoveShouldSetPanResponder: (_, g) => g.dx > 8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
     onPanResponderMove: (_, g) => { if (g.dx > 0) backTranslateX.setValue(g.dx); },
     onPanResponderRelease: (_, g) => {
       if (g.dx > SCREEN_WIDTH * 0.3 || g.vx > 0.5) {
@@ -769,11 +767,8 @@ export default function DetalleGrupoScreen() {
 
         <PagerView
           ref={pagerRef}
-          style={styles.pager}
+          style={{ flex: 1 }}
           initialPage={1}
-          overdrag={false}
-          pageMargin={0}
-          offscreenPageLimit={1}
           onPageSelected={e => {
             const index = e.nativeEvent.position;
             if (index === rankingIndex && !rankingActivo) {
@@ -1704,7 +1699,7 @@ export default function DetalleGrupoScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  backEdgeZone: { position: 'absolute', left: 0, top: 130, bottom: 0, width: 24, zIndex: 50 },
+  backEdgeZone: { position: 'absolute', left: 0, top: 130, bottom: 0, width: 40, zIndex: 50 },
   header: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 16, flexDirection: 'row', alignItems: 'center' },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
   titleWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 },
@@ -1712,7 +1707,6 @@ const styles = StyleSheet.create({
   titleEmoji: { fontSize: 20, marginRight: 8 },
   title: { flex: 1, fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
   tabsContainer: { paddingBottom: 0, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
-  pager: { flex: 1, width: '100%' },
   tabs: { paddingHorizontal: 16, gap: 4 },
   tabBtn: { paddingHorizontal: 12, paddingVertical: 10, alignItems: 'center' },
   tabText: { fontSize: 14, color: 'rgba(255,255,255,0.5)', fontWeight: '500' },
