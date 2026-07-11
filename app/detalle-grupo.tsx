@@ -27,18 +27,6 @@ import { firstName, firstNameOr } from '@/lib/displayName';
 
 const BG = require('@/assets/images/bg.png');
 
-const BUBBLE = {
-  backgroundColor: 'rgba(255,255,255,0.12)',
-  borderWidth: 1,
-  borderColor: 'rgba(255,255,255,0.18)',
-} as const;
-
-const BUBBLE_SELECTED = {
-  backgroundColor: 'rgba(255,255,255,0.22)',
-  borderWidth: 1,
-  borderColor: 'rgba(255,255,255,0.35)',
-} as const;
-
 // Carpeta de descargas elegida una sola vez (SAF). Se recuerda para descargar directo después.
 const DOWNLOAD_DIR_KEY = 'chepaga_download_dir_uri';
 
@@ -1713,10 +1701,10 @@ const styles = StyleSheet.create({
   cardFecha: { fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 },
   cardMonto: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
   cardMontoRojo: { fontSize: 15, fontWeight: '700', color: '#FF4D4D' },
-  monedaBadge: { ...BUBBLE, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, marginTop: 4 },
+  monedaBadge: { backgroundColor: 'rgba(74,158,255,0.15)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, marginTop: 4 },
   monedaBadgeText: { fontSize: 11, color: '#4A9EFF', fontWeight: '600' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  chip: { ...BUBBLE, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
+  chip: { backgroundColor: 'rgba(74,158,255,0.12)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
   chipText: { fontSize: 12, color: 'rgba(255,255,255,0.7)' },
   ticketLink: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10 },
   ticketLinkText: { fontSize: 13, color: '#4A9EFF', fontWeight: '600' },
@@ -1735,7 +1723,7 @@ const styles = StyleSheet.create({
   gastoDetalleMonto: { fontSize: 24, color: '#FFFFFF', fontWeight: '800' },
   gastoDetalleSubMonto: { fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 4 },
   gastoDetalleGrid: { marginTop: 18, gap: 10 },
-  gastoDetalleItem: { ...BUBBLE, borderRadius: 14, padding: 12 },
+  gastoDetalleItem: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   gastoDetalleLabel: { fontSize: 11, color: 'rgba(255,255,255,0.42)', textTransform: 'uppercase', fontWeight: '700', marginBottom: 4 },
   gastoDetalleValor: { fontSize: 14, color: '#FFFFFF', fontWeight: '600' },
   gastoDetalleSeccion: { fontSize: 12, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', fontWeight: '700', marginTop: 18, marginBottom: 10 },
@@ -1753,7 +1741,7 @@ const styles = StyleSheet.create({
   ticketModalError: { color: 'rgba(255,255,255,0.7)', fontSize: 15 },
   exportarBtn: { backgroundColor: '#4A9EFF', borderRadius: 50, paddingVertical: 14, paddingHorizontal: 28, alignSelf: 'flex-start', marginTop: 8, marginBottom: 8 },
   exportarText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-  exportOpcionBtn: { ...BUBBLE, borderRadius: 50, paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center', width: '100%' },
+  exportOpcionBtn: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 50, paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center', width: '100%' },
   exportOpcionText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   avatarCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(74,158,255,0.25)', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   avatarLetra: { color: '#FFFFFF', fontWeight: '700', fontSize: 16 },
@@ -1816,10 +1804,10 @@ const styles = StyleSheet.create({
   miembroInicial: { color: '#FFFFFF', fontWeight: '700', fontSize: 16 },
   miembroNombreRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   miembroNombre: { fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
-  adminBadge: { ...BUBBLE, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
+  adminBadge: { backgroundColor: 'rgba(245,158,11,0.15)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
   adminBadgeText: { fontSize: 11, color: '#F5A623', fontWeight: '600' },
-  agregarAmigoBtn: { ...BUBBLE, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },
-  agregarAmigoBtnActivo: BUBBLE_SELECTED,
+  agregarAmigoBtn: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(74,158,255,0.4)' },
+  agregarAmigoBtnActivo: { backgroundColor: 'rgba(74,158,255,0.2)', borderColor: 'rgba(74,158,255,0.6)' },
   agregarAmigoText: { fontSize: 13, color: '#4A9EFF', fontWeight: '600' },
   agregarAmigoTextActivo: { color: '#FFFFFF' },
   agregarMiembroBtn: {
@@ -1921,14 +1909,14 @@ const styles = StyleSheet.create({
   configFotoRemoveText: { color: '#FF6B6B', fontSize: 12, fontWeight: '700' },
   configMonedaCard: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   configMonedaCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 10 },
-  configMonedaBadge: { ...BUBBLE_SELECTED, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  configMonedaBadge: { backgroundColor: '#4A9EFF', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   configMonedaCodigo: { fontSize: 12, color: '#FFFFFF', fontWeight: '700' },
   configMonedaNombreCard: { flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
   configMonedaNombre: { flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.8)' },
   configMonedaBase: { fontSize: 12, color: 'rgba(255,255,255,0.4)' },
   tasaModoRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  tasaModoBtn: { flex: 1, ...BUBBLE, borderRadius: 20, paddingVertical: 8, paddingHorizontal: 10, alignItems: 'center' },
-  tasaModoBtnActivo: BUBBLE_SELECTED,
+  tasaModoBtn: { flex: 1, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 20, paddingVertical: 8, paddingHorizontal: 10, alignItems: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)' },
+  tasaModoBtnActivo: { backgroundColor: 'rgba(74,158,255,0.2)', borderColor: 'rgba(74,158,255,0.5)' },
   tasaModoBtnText: { fontSize: 12, color: 'rgba(255,255,255,0.5)', fontWeight: '600' },
   tasaModoBtnTextActivo: { color: '#FFFFFF' },
   configTasaAutoValor: { fontSize: 13, color: '#4A9EFF', fontWeight: '600', paddingVertical: 4 },
@@ -1946,7 +1934,7 @@ const styles = StyleSheet.create({
   },
   agregarMonedaText: { fontSize: 14, color: '#4A9EFF', fontWeight: '600' },
   monedasDisponiblesContainer: { marginTop: 8, gap: 8 },
-  monedaDisponibleChip: { ...BUBBLE, borderRadius: 10, padding: 12 },
+  monedaDisponibleChip: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   monedaDisponibleText: { fontSize: 14, color: 'rgba(255,255,255,0.8)' },
   configSwitchRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
@@ -1966,16 +1954,16 @@ const styles = StyleSheet.create({
   configSwitchThumbActivo: { alignSelf: 'flex-end' },
   configMiembroRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 12, marginBottom: 8, gap: 10 },
   configMiembroNombre: { flex: 1, fontSize: 14, color: '#FFFFFF', fontWeight: '500' },
-  configAdminBtn: { ...BUBBLE, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 },
-  configAdminBtnActivo: BUBBLE_SELECTED,
+  configAdminBtn: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(74,158,255,0.4)' },
+  configAdminBtnActivo: { backgroundColor: '#4A9EFF', borderColor: '#4A9EFF' },
   configAdminBtnText: { fontSize: 12, color: '#4A9EFF', fontWeight: '600' },
   configGuardarBtn: { backgroundColor: '#4A9EFF', borderRadius: 50, paddingVertical: 16, alignItems: 'center', marginTop: 24 },
   configGuardarText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   pausadoBanner: { backgroundColor: 'rgba(245,158,11,0.12)', borderBottomWidth: 1, borderBottomColor: 'rgba(245,158,11,0.25)', paddingVertical: 8, alignItems: 'center' },
   pausadoBannerText: { fontSize: 13, color: '#F5A623', fontWeight: '600' },
   historialMonedaSelector: { flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
-  historialMonedaChip: { ...BUBBLE, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
-  historialMonedaChipActivo: BUBBLE_SELECTED,
+  historialMonedaChip: { backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)' },
+  historialMonedaChipActivo: { backgroundColor: 'rgba(74,158,255,0.2)', borderColor: 'rgba(74,158,255,0.5)' },
   historialMonedaChipText: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.55)' },
   historialMonedaChipTextActivo: { color: '#FFFFFF' },
 });

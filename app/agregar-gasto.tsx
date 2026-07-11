@@ -16,18 +16,6 @@ import { firstNameOr } from '@/lib/displayName';
 
 const BG = require('@/assets/images/bg.png');
 
-const BUBBLE = {
-  backgroundColor: 'rgba(255,255,255,0.12)',
-  borderWidth: 1,
-  borderColor: 'rgba(255,255,255,0.18)',
-} as const;
-
-const BUBBLE_SELECTED = {
-  backgroundColor: 'rgba(255,255,255,0.22)',
-  borderWidth: 1,
-  borderColor: 'rgba(255,255,255,0.35)',
-} as const;
-
 const INPUT = {
   backgroundColor: 'rgba(255,255,255,0.08)',
   borderRadius: 12,
@@ -419,11 +407,11 @@ const styles = StyleSheet.create({
   inputError: { borderColor: '#FF4D4D' },
   montoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   montoInput: { flex: 1 },
-  monedaBadge: { ...BUBBLE_SELECTED, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
+  monedaBadge: { backgroundColor: 'rgba(74,158,255,0.25)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(74,158,255,0.4)' },
   monedaBadgeText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   monedasChips: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  monedaChip: { ...BUBBLE, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10 },
-  monedaChipActivo: BUBBLE_SELECTED,
+  monedaChip: { backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)' },
+  monedaChipActivo: { backgroundColor: 'rgba(74,158,255,0.2)', borderColor: 'rgba(74,158,255,0.5)' },
   monedaChipText: { fontSize: 14, color: 'rgba(255,255,255,0.5)', fontWeight: '600' },
   monedaChipTextActivo: { color: '#FFFFFF' },
   tasaNota: { fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 8 },
@@ -439,11 +427,11 @@ const styles = StyleSheet.create({
   dropdownItemText: { fontSize: 14, color: '#FFFFFF' },
   cerrarBtn: { paddingVertical: 12, alignItems: 'center' },
   cerrarText: { fontSize: 14, color: '#4A9EFF', fontWeight: '700' },
-  categoriaBtn: { ...BUBBLE_SELECTED, borderRadius: 50, paddingHorizontal: 20, paddingVertical: 12, alignSelf: 'flex-start' },
+  categoriaBtn: { backgroundColor: 'rgba(74,158,255,0.2)', borderRadius: 50, paddingHorizontal: 20, paddingVertical: 12, alignSelf: 'flex-start', borderWidth: 1, borderColor: 'rgba(74,158,255,0.4)' },
   categoriaBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
   categoriaBtnError: { backgroundColor: 'rgba(255,77,77,0.2)', borderColor: 'rgba(255,77,77,0.5)' },
   ticketRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  ticketPreviewWrap: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 24, ...BUBBLE, borderRadius: 12, padding: 12 },
+  ticketPreviewWrap: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 24, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
   ticketPreview: { width: 56, height: 56, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.08)' },
   ticketPreviewInfo: { flex: 1 },
   ticketPreviewLabel: { fontSize: 14, fontWeight: '600', color: '#FFFFFF' },
