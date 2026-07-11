@@ -1,7 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, useWindowDimensions, ScrollView, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import PagerView from '@/components/PagerViewCompat';
 import { useRouter } from 'expo-router';
 import { useAmistadStore } from '@/store/useAmistadStore';
 import { useNotificacionesStore } from '@/store/useNotificacionesStore';
@@ -47,7 +46,8 @@ export default function TabLayout() {
 function TabsContent() {
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
-  const pagerRef = useRef<PagerView>(null);
+  const pagerRef = useRef<ScrollView>(null);
+  const [pagerWidth, setPagerWidth] = useState(screenWidth);
   const [activeIdx, setActiveIdx] = useState(0);
   const [accionesVisible, setAccionesVisible] = useState(false);
 
@@ -105,28 +105,62 @@ function TabsContent() {
     });
   }, [userId, grupos]);
 
-  const goTo = (idx: number) => {
-    pagerRef.current?.setPage(idx);
+  const pageWidth = Math.max(1, pagerWidth || screenWidth);
+
+  useEffect(() => {
+    pagerRef.current?.scrollTo({ x: activeIdx * pageWidth, animated: false });
+  }, [activeIdx, pageWidth]);
+
+  const snapToNearestPage = (offsetX: number, animated: boolean) => {
+    const idx = Math.min(PAGES.length - 1, Math.max(0, Math.round(offsetX / pageWidth)));
     setActiveIdx(idx);
+    pagerRef.current?.scrollTo({ x: idx * pageWidth, animated });
+  };
+
+  const handleMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    snapToNearestPage(event.nativeEvent.contentOffset.x, false);
+  };
+
+  const handleScrollEndDrag = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const velocityX = event.nativeEvent.velocity?.x ?? 0;
+    if (Math.abs(velocityX) < 0.2) {
+      snapToNearestPage(event.nativeEvent.contentOffset.x, true);
+    }
+  };
+
+  const goTo = (idx: number) => {
+    setActiveIdx(idx);
+    pagerRef.current?.scrollTo({ x: idx * pageWidth, animated: true });
   };
 
   return (
-    <View style={styles.root}>
-      <PagerView
+    <View
+      style={styles.root}
+      onLayout={event => setPagerWidth(event.nativeEvent.layout.width)}
+    >
+      <ScrollView
         ref={pagerRef}
         style={styles.pager}
-        initialPage={0}
-        overdrag={false}
-        pageMargin={0}
-        offscreenPageLimit={1}
-        onPageSelected={e => setActiveIdx(e.nativeEvent.position)}
+        contentContainerStyle={{ width: pageWidth * PAGES.length }}
+        horizontal
+        pagingEnabled
+        bounces={false}
+        alwaysBounceHorizontal={false}
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        snapToInterval={pageWidth}
+        snapToAlignment="start"
+        disableIntervalMomentum
+        scrollEventThrottle={16}
+        onMomentumScrollEnd={handleMomentumEnd}
+        onScrollEndDrag={handleScrollEndDrag}
       >
         {PAGES.map((page) => (
-          <View key={page.key} collapsable={false} style={[styles.page, { width: screenWidth }]}>
+          <View key={page.key} collapsable={false} style={[styles.page, { width: pageWidth }]}>
             <page.component />
           </View>
         ))}
-      </PagerView>
+      </ScrollView>
 
       <View style={styles.tabBarWrap}>
         <View style={styles.tabBarInner}>
