@@ -180,9 +180,9 @@ export default function HomeScreen() {
 }
 
 const GLASS = {
-  backgroundColor: 'rgba(14,26,52,0.62)',
+  backgroundColor: 'rgba(255,255,255,0.12)',
   borderWidth: 1,
-  borderColor: 'rgba(255,255,255,0.1)',
+  borderColor: 'rgba(255,255,255,0.18)',
   borderRadius: 20,
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 8 },
@@ -236,10 +236,10 @@ const styles = StyleSheet.create({
   },
   actividadIcono: {
     width: 42, height: 42, borderRadius: 12,
-    backgroundColor: 'rgba(74,158,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center', justifyContent: 'center',
     marginRight: 12,
-    borderWidth: 1, borderColor: 'rgba(74,158,255,0.25)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
   },
   actividadInfo: { flex: 1 },
   actividadNombre: { fontSize: 14, fontWeight: '600', color: '#FFFFFF' },

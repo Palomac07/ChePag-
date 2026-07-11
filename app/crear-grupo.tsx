@@ -14,6 +14,18 @@ import { usePendingGroupPhotoStore } from '@/store/usePendingGroupPhotoStore';
 const BG = require('@/assets/images/bg.png');
 const categorias = ['Viaje', 'Evento', 'Otro'];
 
+const BUBBLE = {
+  backgroundColor: 'rgba(255,255,255,0.12)',
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.18)',
+} as const;
+
+const BUBBLE_SELECTED = {
+  backgroundColor: 'rgba(255,255,255,0.22)',
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.35)',
+} as const;
+
 const MONEDAS_DISPONIBLES: Moneda[] = [
   { codigo: 'ARS', nombre: 'Peso argentino', simbolo: '$', tasaARS: 1 },
   { codigo: 'USD', nombre: 'Dólar estadounidense', simbolo: 'U$S', tasaARS: 1050 },
@@ -327,10 +339,9 @@ const styles = StyleSheet.create({
   categoriasRow: { flexDirection: 'row', gap: 10, marginTop: 8, marginBottom: 4 },
   categoriaChip: {
     paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)',
+    ...BUBBLE,
   },
-  categoriaChipActivo: { backgroundColor: 'rgba(74,158,255,0.2)', borderColor: 'rgba(74,158,255,0.5)' },
+  categoriaChipActivo: BUBBLE_SELECTED,
   categoriaText: { fontSize: 14, color: 'rgba(255,255,255,0.55)' },
   categoriaTextActivo: { fontWeight: '700', color: '#FFFFFF' },
   botonesRow: { flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 20 },
@@ -344,7 +355,7 @@ const styles = StyleSheet.create({
     marginBottom: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)',
   },
-  monedaChipActivo: { borderColor: 'rgba(74,158,255,0.5)', backgroundColor: 'rgba(74,158,255,0.1)' },
+  monedaChipActivo: BUBBLE_SELECTED,
   monedaChipBase: { opacity: 0.7 },
   monedaChipLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   monedaCheckbox: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
@@ -355,8 +366,8 @@ const styles = StyleSheet.create({
   monedaBaseLabel: { fontSize: 12, color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' },
   tasaExpandida: { backgroundColor: 'rgba(74,158,255,0.08)', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(74,158,255,0.2)' },
   tasaModoRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  tasaModoBtn: { flex: 1, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 20, paddingVertical: 8, paddingHorizontal: 10, alignItems: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)' },
-  tasaModoBtnActivo: { backgroundColor: '#4A9EFF', borderColor: '#4A9EFF' },
+  tasaModoBtn: { flex: 1, ...BUBBLE, borderRadius: 20, paddingVertical: 8, paddingHorizontal: 10, alignItems: 'center' },
+  tasaModoBtnActivo: BUBBLE_SELECTED,
   tasaModoBtnText: { fontSize: 12, color: 'rgba(255,255,255,0.5)', fontWeight: '600' },
   tasaModoBtnTextActivo: { color: '#FFFFFF' },
   tasaAutoValor: { fontSize: 13, color: '#4A9EFF', fontWeight: '600', paddingVertical: 4 },

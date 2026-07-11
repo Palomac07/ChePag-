@@ -17,9 +17,9 @@ const COLORES = ['#9B8EC4', '#7BC4B8', '#6BAED6', '#5BAA9F', '#C084C0', '#4A6580
 type UsuarioBusqueda = { id: string; nombre: string; username: string };
 
 const GLASS = {
-  backgroundColor: 'rgba(14,26,52,0.62)',
+  backgroundColor: 'rgba(255,255,255,0.12)',
   borderWidth: 1,
-  borderColor: 'rgba(255,255,255,0.1)',
+  borderColor: 'rgba(255,255,255,0.18)',
   borderRadius: 14,
 } as const;
 
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
   opcionItem: { ...GLASS, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, marginBottom: 8 },
   opcionText: { flex: 1, fontSize: 15, color: '#FFFFFF' },
   amigoItem: { ...GLASS, flexDirection: 'row', alignItems: 'center', padding: 14, marginBottom: 8 },
-  amigoItemActivo: { borderColor: 'rgba(74,158,255,0.5)', backgroundColor: 'rgba(74,158,255,0.12)' },
+  amigoItemActivo: { borderColor: 'rgba(255,255,255,0.35)', backgroundColor: 'rgba(255,255,255,0.22)' },
   avatarCircle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   avatarLetra: { color: '#FFFFFF', fontWeight: '700', fontSize: 16 },
   amigoNombre: { fontSize: 15, color: '#FFFFFF', fontWeight: '500' },
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
   yaAmigoTag: { backgroundColor: 'rgba(52,211,153,0.15)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(52,211,153,0.4)' },
   yaAmigoText: { color: '#34D399', fontSize: 13, fontWeight: '600' },
   seleccionadosRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  seleccionadoChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(74,158,255,0.15)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6, gap: 6, borderWidth: 1, borderColor: 'rgba(74,158,255,0.35)' },
+  seleccionadoChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6, gap: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
   chipAvatar: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   chipLetra: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
   chipNombre: { fontSize: 13, color: '#FFFFFF' },
