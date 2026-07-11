@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Modal, PanResponder, Animated, Dimensions, Alert, RefreshControl, ActivityIndicator, Keyboard, ImageBackground, Platform,
 } from 'react-native';
@@ -52,6 +52,10 @@ function formatearFecha(iso: string): string {
 }
 
 type MiembroRef = { user_id: string; nombre: string };
+
+const MIEMBROS_VACIOS: MiembroRef[] = [];
+const ADMINISTRADORES_VACIOS: string[] = [];
+const MONEDAS_DEFAULT: Moneda[] = [{ codigo: 'ARS', nombre: 'Peso argentino', simbolo: '$', tasaARS: 1 }];
 
 // Saldos por identidad estable (user_id) para que un cambio de nombre no parta a
 // una persona en dos. Se devuelve igual { nombre, monto } con el nombre canónico
@@ -142,9 +146,9 @@ export default function DetalleGrupoScreen() {
   const userId = useUserStore(s => s.id);
   const miNombre = useUserStore(s => s.nombre);
   const guardarPresupuestoDB = useGruposStore(s => s.guardarPresupuesto);
-  const miembrosGrupo = grupo?.miembros ?? [];
-  const monedas = grupo?.monedas ?? [{ codigo: 'ARS', nombre: 'Peso argentino', simbolo: '$', tasaARS: 1 }];
-  const administradores = grupo?.administradores ?? [];
+  const miembrosGrupo = grupo?.miembros ?? MIEMBROS_VACIOS;
+  const monedas = grupo?.monedas ?? MONEDAS_DEFAULT;
+  const administradores = grupo?.administradores ?? ADMINISTRADORES_VACIOS;
   const esAdmin = miembrosGrupo.some(m => m.user_id === userId && m.es_admin) || (!!miNombre && administradores.includes(miNombre));
   const esCreador = grupo?.creador_id === userId;
   const rankingActivo = grupo?.rankingActivo !== false;
@@ -157,6 +161,7 @@ export default function DetalleGrupoScreen() {
   const eliminarAmigo = useAmistadStore(s => s.eliminarAmigo);
 
   const [gastos, setGastos] = useState<Gasto[]>([]);
+  const [gastosVisibles, setGastosVisibles] = useState(20);
   const [ticketUrl, setTicketUrl] = useState<string | null>(null);
   const [ticketVisible, setTicketVisible] = useState(false);
   const [ticketCargando, setTicketCargando] = useState(false);
@@ -191,7 +196,11 @@ export default function DetalleGrupoScreen() {
     if (!id) return;
     if (esRefresh) setRefrescando(true); else setCargando(true);
     const [{ data: gastosData }, { data: pagosData }, { data: pendientesData }] = await Promise.all([
-      supabase.from('gastos').select('*').eq('grupo_id', id).order('fecha', { ascending: false }),
+      supabase
+        .from('gastos')
+        .select('id,nombre,pagador_nombre,pagador_id,fecha,created_at,monto,participantes,moneda,foto_path,categoria')
+        .eq('grupo_id', id)
+        .order('fecha', { ascending: false }),
       supabase.from('pagos').select('de_nombre, a_nombre, monto').eq('grupo_id', id),
       supabase.from('notificaciones').select('data').eq('tipo', 'pago_pendiente').eq('sender_id', userId ?? '').eq('leida', false),
     ]);
@@ -220,19 +229,23 @@ export default function DetalleGrupoScreen() {
   }, [id, userId]);
 
   useFocusEffect(useCallback(() => {
+    setGastosVisibles(20);
     cargarDatos();
     if (userId) {
       cargarAmigos(userId);
       cargarSolicitudesEnviadas(userId);
     }
-  }, [cargarDatos, userId]));
+  }, [cargarAmigos, cargarDatos, cargarSolicitudesEnviadas, userId]));
 
   useEffect(() => {
     if (grupo?.presupuesto != null) setPresupuesto(grupo.presupuesto);
   }, [grupo?.presupuesto]);
 
-  const monedasMap: Record<string, Moneda> = {};
-  for (const m of monedas) monedasMap[m.codigo] = m;
+  const monedasMap = useMemo(() => {
+    const mapa: Record<string, Moneda> = {};
+    for (const m of monedas) mapa[m.codigo] = m;
+    return mapa;
+  }, [monedas]);
   const tieneVariasMonedas = monedas.length > 1;
 
   const [tabActivo, setTabActivo] = useState('Gastos');
@@ -512,8 +525,8 @@ export default function DetalleGrupoScreen() {
     mostrarPopup('✅', '¡Configuración guardada!', 'Los cambios fueron aplicados al grupo.');
   };
 
-  const balance = calcularBalance(gastos, monedas, pagosDB, miembrosGrupo);
-  const deudas = calcularDeudas(gastos, monedas, pagosDB, miembrosGrupo);
+  const balance = useMemo(() => calcularBalance(gastos, monedas, pagosDB, miembrosGrupo), [gastos, miembrosGrupo, monedas, pagosDB]);
+  const deudas = useMemo(() => calcularDeudas(gastos, monedas, pagosDB, miembrosGrupo), [gastos, miembrosGrupo, monedas, pagosDB]);
   const rankingIndex = TABS.indexOf('Ranking');
   const balanceIndex = TABS.indexOf('Balance');
 
@@ -531,8 +544,11 @@ export default function DetalleGrupoScreen() {
     pagerRef.current?.setPage(index);
   };
 
-  const maxMonto = Math.max(...balance.map(b => Math.abs(b.monto)), 1);
-  const totalGastado = gastos.reduce((sum: number, g: Gasto) => sum + g.monto * (monedasMap[g.moneda]?.tasaARS ?? 1), 0);
+  const maxMonto = useMemo(() => Math.max(...balance.map(b => Math.abs(b.monto)), 1), [balance]);
+  const totalGastado = useMemo(
+    () => gastos.reduce((sum: number, g: Gasto) => sum + g.monto * (monedasMap[g.moneda]?.tasaARS ?? 1), 0),
+    [gastos, monedasMap]
+  );
   const porcentajeGastado = presupuesto ? Math.min((totalGastado / presupuesto) * 100, 100) : 0;
   const sobrepasa = presupuesto ? totalGastado > presupuesto : false;
 
@@ -879,7 +895,7 @@ export default function DetalleGrupoScreen() {
               : gastos.length === 0
                 ? <View style={styles.card}><Text style={{ textAlign: 'center', color: 'rgba(255,255,255,0.45)' }}>No hay gastos todavía.</Text></View>
                 : null}
-            {gastos.map((g) => {
+            {gastos.slice(0, gastosVisibles).map((g) => {
               const monedaOrigen = monedasMap[g.moneda] ?? { simbolo: '$', tasaARS: 1 };
               const monedaDestino = monedasMap[monedaHistorial] ?? { simbolo: '$', tasaARS: 1 };
               const montoMostrado = (g.monto * monedaOrigen.tasaARS) / monedaDestino.tasaARS;
@@ -928,6 +944,11 @@ export default function DetalleGrupoScreen() {
                 </View>
               );
             })}
+            {gastos.length > gastosVisibles && (
+              <TouchableOpacity style={styles.verMasGastosBtn} onPress={() => setGastosVisibles(v => v + 20)}>
+                <Text style={styles.verMasGastosText}>Ver más gastos</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={styles.exportarBtn} onPress={() => setExportModalVisible(true)}>
               <Text style={styles.exportarText}>Exportar</Text>
             </TouchableOpacity>
@@ -1745,6 +1766,8 @@ const styles = StyleSheet.create({
   ticketModalError: { color: 'rgba(255,255,255,0.7)', fontSize: 15 },
   exportarBtn: { backgroundColor: '#4A9EFF', borderRadius: 50, paddingVertical: 14, paddingHorizontal: 28, alignSelf: 'flex-start', marginTop: 8, marginBottom: 8 },
   exportarText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  verMasGastosBtn: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 50, paddingVertical: 13, paddingHorizontal: 22, alignSelf: 'center', marginTop: 4, marginBottom: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  verMasGastosText: { color: 'rgba(255,255,255,0.82)', fontSize: 14, fontWeight: '700' },
   exportOpcionBtn: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 50, paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center', width: '100%' },
   exportOpcionText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   avatarCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(74,158,255,0.25)', alignItems: 'center', justifyContent: 'center', marginRight: 12 },

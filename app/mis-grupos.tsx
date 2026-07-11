@@ -56,6 +56,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
+  title: { fontSize: 22, fontWeight: '700', color: '#FFFFFF' },
   scrollContent: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 40 },
 });

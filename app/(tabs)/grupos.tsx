@@ -1,6 +1,5 @@
 import { ScrollView, View, Text, StyleSheet, ImageBackground } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { useGruposStore } from '@/store/useGruposStore';
 import { useUserStore } from '@/store/useUserStore';
@@ -16,7 +15,7 @@ export default function GruposScreen() {
 
   useFocusEffect(useCallback(() => {
     if (userId) cargarGrupos(userId);
-  }, [userId]));
+  }, [cargarGrupos, userId]));
 
   return (
     <ImageBackground source={BG} style={styles.root} resizeMode="cover" imageStyle={{ transform: [{ scale: 1.08 }] }}>
@@ -41,7 +40,7 @@ export default function GruposScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { paddingTop: 72, paddingHorizontal: 24, paddingBottom: 20 },
-  title: { fontSize: 28, fontWeight: '700', color: '#FFFFFF', letterSpacing: -0.5 },
+  title: { fontSize: 22, fontWeight: '700', color: '#FFFFFF' },
   body: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40 },
 });

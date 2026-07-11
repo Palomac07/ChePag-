@@ -70,10 +70,9 @@ const GLASS = {
   borderWidth: 1,
   borderColor: 'rgba(255,255,255,0.1)',
   borderRadius: 20,
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 6 },
-  shadowOpacity: 0.4,
-  shadowRadius: 16,
+  shadowOpacity: 0,
+  shadowRadius: 0,
+  elevation: 0,
 } as const;
 
 const styles = StyleSheet.create({

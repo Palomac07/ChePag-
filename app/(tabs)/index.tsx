@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   chipsScroll: { marginBottom: 0 },
 
   header: { marginBottom: 28 },
-  bienvenido: { fontSize: 34, fontWeight: '700', color: '#FFFFFF', letterSpacing: -0.5 },
+  bienvenido: { fontSize: 22, fontWeight: '700', color: '#FFFFFF' },
   nombre: { fontSize: 16, color: 'rgba(255,255,255,0.52)', marginTop: 4 },
 
   balanceRow: { alignItems: 'center', marginBottom: 28 },
