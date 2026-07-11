@@ -112,7 +112,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(74,158,255,0.2)',
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 12,
-    borderWidth: 2, borderColor: 'rgba(74,158,255,0.4)',
   },
   avatarLetra: { fontSize: 36, fontWeight: '700', color: '#FFFFFF' },
   nombre: { fontSize: 18, fontWeight: '700', color: '#FFFFFF' },

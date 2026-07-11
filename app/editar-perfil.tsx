@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 20, paddingTop: 4 },
 
   avatarContainer: { alignItems: 'center', marginBottom: 20 },
-  avatarCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(74,158,255,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 10, borderWidth: 2, borderColor: 'rgba(74,158,255,0.4)' },
+  avatarCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(74,158,255,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   avatarLetra: { fontSize: 32, fontWeight: '700', color: '#FFFFFF' },
   nombre: { fontSize: 17, fontWeight: '700', color: '#FFFFFF' },
   usernameLabel: { fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 2 },

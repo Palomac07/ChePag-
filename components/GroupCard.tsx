@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
   grupoParticipantes: { fontSize: 13, color: 'rgba(255,255,255,0.42)', marginTop: 3 },
   textMuted: { color: 'rgba(255,255,255,0.42)' },
   avatarRow: { flexDirection: 'row', marginTop: 12 },
-  avatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(5,8,22,0.8)' },
+  avatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
   badgesCol: { flexDirection: 'column', gap: 6, alignItems: 'flex-end' },
   badge: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
